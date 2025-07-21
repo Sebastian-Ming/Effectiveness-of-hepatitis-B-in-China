@@ -48,7 +48,7 @@ library(ggtext)
 library(ggh4x)
 getwd()
 
-setwd("D:/研究生/乙肝干预/全国乙肝数据/整理后的数据/乙肝")
+setwd("D:/~")
 #######################Functions################################################
 n.cir=10000
 #2002 intervention NIP for each PLAD
@@ -312,108 +312,8 @@ EIR.2002<-function(Sequence,database,model,Location,intervention,n.cir){
   return(EMR.reserve)
 }
 
-#######################Age group 5, only 2002 intervention###############################
-setwd("D:/研究生/乙肝干预/全国研究")
-Hepatitis.B.agegroup5<-read.xlsx("Agegroup5.xlsx")
-Hepatitis.B.agegroup5$Month.factor<-factor(Hepatitis.B.agegroup5$Month)
-Hepatitis.B.agegroup5$Time<-rep(c(0:179),31)
-Hepatitis.B.agegroup5$Holiday<-factor(rep(rep(c(1,1,0,0,0,0,2,2,0,0,0,0),15),31))
-#Intervention term
-Hepatitis.B.agegroup5$Intervention.2002<-factor(rep(c(rep(0,12*1),rep(1,14*12)),31))
-#Interaction term
-Hepatitis.B.agegroup5$Interaction.2002<-rep(c(rep(0,1*12),c(0:(180-1*12-1))),31)
-#A matrix and a vector to save results
-regions<-as.character(unique(Hepatitis.B.agegroup5$Province))
-datalist<-lapply(regions, function(x) Hepatitis.B.agegroup5[Hepatitis.B.agegroup5$Province==x, ])
-seq(datalist)
-yori1<-matrix(0, length(datalist), 2, dimnames=list(regions, paste("beta", seq(2,3), sep="")))
-Sori1<-vector("list", length(datalist)); names(Sori2) <- regions
-for(i in c(1:31))
-{sub.data<-Hepatitis.B.agegroup5[which(Hepatitis.B.agegroup5$Order==i),]
-mfirst<-gam(Case~ offset(log(Population.book))+Intervention.2002+Time+
-              ns(Temperature,df=3)+
-              Holiday+Interaction.2002,
-            family=quasipoisson(link='log'),data=sub.data)
-lengthfun<-length(summary(mfirst)$p.coeff)
-yori1[i,c(1:2)] <- as.data.frame(summary(mfirst)$p.coeff)[c(2,lengthfun),1]
-Sori1[[i]] <- vcov(mfirst)[c(2,lengthfun),c(2,lengthfun)]
-assign(paste("model1.",i,sep=""),mfirst)
-}
-
-#meta analysis
-mvall1<-mvmeta(yori2[-c(1,2,6,9,26,31),]~1, Sori2[-c(1,2,6,9,26,31)], method="reml")
-summary(mvall1)
-
-#ER
-ER1<-ER.meta.2002(mvall1,1)
-#write.xlsx(ER1,file ="D:/研究生/乙肝干预/全国研究/二版结果/ER meta agegroup5.xlsx")
-ER1$ER.lower<-as.numeric(ER1$ER.lower)
-ER1$ER.upper<-as.numeric(ER1$ER.upper)
-ER1$ER<-as.numeric(ER1$ER)
-
-#EIR
-EIR1<-EIR.2002(c(3:5,7,8,10:25,27:31),Hepatitis.B.agegroup5,"model1",c(2,9),14,10000)
-EIR1<-data.frame(EIR1)
-EIR1$EC.point<-sprintf("%0.0f",EIR1$EC.point)
-EIR1$Population<-sprintf("%0.0f",EIR1$Population)
-EIR1$EIR.point<-sprintf("%0.2f",EIR1$EIR.point)
-EIR1$EC.low<-sprintf("%0.0f",EIR1$EC.low)
-EIR1$EIR.low<-sprintf("%0.2f",EIR1$EIR.low)
-EIR1$EC.high<-sprintf("%0.0f",EIR1$EC.high)
-EIR1$EIR.high<-sprintf("%0.2f",EIR1$EIR.high)
-#write.xlsx(EIR1,file ="D:/研究生/乙肝干预/全国研究/二版结果/EIR agegroup5.xlsx",rowNames=T)
-
-#Save the cofficients β
-Coefficient1<-matrix(0,nrow=32,ncol=6)
-Coefficient1<-as.data.frame(Coefficient1)
-colnames(Coefficient1)<-c("Age","PLADs","RR1 (95%CI)","RR2 (95%CI)","RR3 (95%CI)","Trend")
-Coefficient1$Age<-c("3")
-yori<-matrix(0,length(datalist),1,dimnames=list(regions, paste("beta",1,sep="")))
-Sori<-vector("list", length(datalist)); names(Sori) <- regions
-for (i in 1:31)
-{model.number<-eval(parse(text=paste("model1.",i,sep="")))
-#Level change
-Point1<-model.number$coefficients[2]
-Se1<-summary(model.number)$se[2]
-#Pre-intervention slope
-Point2<-model.number$coefficients[3]
-Se2<-summary(model.number)$se[3]
-#Post-intervention slope change
-length.coef<-length(model.number$coefficients)
-Point3<-model.number$coefficients[length.coef]
-Se3<-summary(model.number)$se[length.coef]
-Coefficient1[i,2]<-Name[i]
-Coefficient1[i,3]<-paste0(sprintf("%0.3f",Point1)," (",sprintf("%0.3f",Point1-1.96*Se1),
-                          ", ",sprintf("%0.3f",Point1+1.96*Se1),")")
-Coefficient1[i,4]<-paste0(sprintf("%0.3f",Point2)," (",sprintf("%0.3f",Point2-1.96*Se2),
-                          ", ",sprintf("%0.3f",Point2+1.96*Se2),")") 
-Coefficient1[i,5]<-paste0(sprintf("%0.3f",Point3)," (",sprintf("%0.3f",Point3-1.96*Se3),
-                          ", ",sprintf("%0.3f",Point3+1.96*Se3),")")
-Coefficient1[i,6]<-round(summary(model.number)$p.pv[length.coef],3)
-yori[i,]<-as.data.frame(summary(model.number)$p.coeff)[c(3),1]
-Sori[[i]]<-vcov(model.number)[c(3),c(3)]
-}
-mvall<-mvmeta(yori[-c(1,2,6,9,26),]~1, Sori[-c(1,2,6,9,26)], method="reml")
-mvall<-summary(mvall)
-mvall1<-summary(mvall1)
-Coefficient1[32,2]<-c("Chinese mainland")
-Coefficient1[32,4]<-paste0(sprintf("%0.3f",mvall$coefficients[1])," (",
-                           sprintf("%0.3f",mvall$coefficients[1]-1.96*mvall$coefficients[2]),
-                           ", ",sprintf("%0.3f",mvall$coefficients[1]+1.96*mvall$coefficients[2]),")")
-Coefficient1[32,3]<-paste0(sprintf("%0.3f",mvall1$coefficients[1,1])," (",
-                           sprintf("%0.3f",mvall1$coefficients[1,1]-1.96*mvall1$coefficients[1,2]),
-                           ", ",sprintf("%0.3f",mvall1$coefficients[1,1]+1.96*mvall1$coefficients[1,2]),")")
-Coefficient1[32,5]<-paste0(sprintf("%0.3f",mvall1$coefficients[2,1])," (",
-                           sprintf("%0.3f",mvall1$coefficients[2,1]-1.96*mvall1$coefficients[2,2]),
-                           ", ",sprintf("%0.3f",mvall1$coefficients[2,1]+1.96*mvall1$coefficients[2,2]),")")
-Coefficient1[32,6]<-round(mvall1$coefficients[2,4],3)
-#write.xlsx(Coefficient1,file ="D:/研究生/乙肝干预/全国研究/二版结果/Beta agegroup5.xlsx",rowNames=T)
-
-mvall.1<-mvall
-mvall1<-mvmeta(yori1[-c(1,2,6,9,26),]~1, Sori1[-c(1,2,6,9,26)], method="reml")
-
 #######################Age group 6, only 2002 intervention###############################
-setwd("D:/研究生/乙肝干预/全国研究")
+setwd("D:/~")
 Hepatitis.B.agegroup6<-read.xlsx("agegroup6.xlsx")
 Hepatitis.B.agegroup6$Month.factor<-factor(Hepatitis.B.agegroup6$Month)
 Hepatitis.B.agegroup6$Time<-rep(c(0:179),31)
@@ -429,9 +329,7 @@ for(i in c(1:31))
 {sub.data<-Hepatitis.B.agegroup6[which(Hepatitis.B.agegroup6$Order==i),]
 mfirst<-gam(Case~ offset(log(Population.book))+Intervention.2002+Time+
               ns(Temperature,df=3)+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
-              Holiday+Interaction.2002,#+Holiday+GDP+Birth_Rate
+              Holiday+Interaction.2002,
             family=quasipoisson(link='log'), data=sub.data)
 lengthfun<-length(summary(mfirst)$p.coeff)
 yori2[i,c(1:2)] <- as.data.frame(summary(mfirst)$p.coeff)[c(2,lengthfun),1]
@@ -443,7 +341,6 @@ mvall2<-mvmeta(yori2[-c(1,2,6,9,26),]~1, Sori2[-c(1,2,6,9,26)], method="reml")
 summary(mvall2)
 
 ER2<-ER.meta.2002(mvall2,2)
-#write.xlsx(ER2,file ="D:/研究生/乙肝干预/全国研究/二版结果/ER meta agegroup6 update.xlsx")
 ER2$ER.lower<-as.numeric(ER2$ER.lower)
 ER2$ER.upper<-as.numeric(ER2$ER.upper)
 ER2$ER<-as.numeric(ER2$ER)
@@ -457,7 +354,6 @@ EIR2$EC.low<-sprintf("%0.0f",EIR2$EC.low)
 EIR2$EIR.low<-sprintf("%0.2f",EIR2$EIR.low)
 EIR2$EC.high<-sprintf("%0.0f",EIR2$EC.high)
 EIR2$EIR.high<-sprintf("%0.2f",EIR2$EIR.high)
-#write.xlsx(EIR2,file ="D:/研究生/乙肝干预/全国研究/二版结果/EIR agegroup6 update.xlsx",rowNames=T)
 
 Coefficient2<-matrix(0,nrow=32,ncol=6)
 Coefficient2<-as.data.frame(Coefficient2)
@@ -499,12 +395,11 @@ Coefficient2[32,5]<-paste0(sprintf("%0.3f",mvall2$coefficients[2,1])," (",
                            sprintf("%0.3f",mvall2$coefficients[2,1]-1.96*mvall2$coefficients[2,2]),
                            ", ",sprintf("%0.3f",mvall2$coefficients[2,1]+1.96*mvall2$coefficients[2,2]),")")
 Coefficient2[32,6]<-round(mvall2$coefficients[2,4],3)
-#write.xlsx(Coefficient2,file ="D:/研究生/乙肝干预/全国研究/二版结果/Beta agegroup6 update.xlsx",rowNames=T)
 
 mvall.2<-mvall
 mvall2<-mvmeta(yori2[-c(1,2,6,9,26),]~1, Sori2[-c(1,2,6,9,26)], method="reml")
 #######################Age group 7, only 2002 intervention###############################
-setwd("D:/研究生/乙肝干预/全国研究")
+setwd("D:/~")
 Hepatitis.B.agegroup7<-read.xlsx("agegroup7.xlsx")
 Hepatitis.B.agegroup7$Month.factor<-factor(Hepatitis.B.agegroup7$Month)
 Hepatitis.B.agegroup7$Time<-rep(c(0:179),31)
@@ -520,9 +415,7 @@ for(i in c(1:31))
 {sub.data<-Hepatitis.B.agegroup7[which(Hepatitis.B.agegroup7$Order==i),]
 mfirst<-gam(Case~ offset(log(Population.book))+Intervention.2002+Time+
               ns(Temperature,df=3)+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
-              Holiday+Interaction.2002,#+Holiday+GDP+Birth_Rate
+              Holiday+Interaction.2002,
             family=quasipoisson(link='log'), data=sub.data)
 lengthfun<-length(summary(mfirst)$p.coeff)
 yori3[i,c(1:2)] <- as.data.frame(summary(mfirst)$p.coeff)[c(2,lengthfun),1]
@@ -534,7 +427,6 @@ mvall3<-mvmeta(yori3[-c(1,2,9,14,26),]~1, Sori3[-c(1,2,9,14,26)], method="reml")
 summary(mvall3)
 
 ER3<-ER.meta.2002(mvall3,3)
-#write.xlsx(ER3,file ="D:/研究生/乙肝干预/全国研究/二版结果/ER meta agegroup7 update.xlsx")
 ER3$ER.lower<-as.numeric(ER3$ER.lower)
 ER3$ER.upper<-as.numeric(ER3$ER.upper)
 ER3$ER<-as.numeric(ER3$ER)
@@ -548,7 +440,6 @@ EIR3$EC.low<-sprintf("%0.0f",EIR3$EC.low)
 EIR3$EIR.low<-sprintf("%0.2f",EIR3$EIR.low)
 EIR3$EC.high<-sprintf("%0.0f",EIR3$EC.high)
 EIR3$EIR.high<-sprintf("%0.2f",EIR3$EIR.high)
-#write.xlsx(EIR3,file ="D:/研究生/乙肝干预/全国研究/二版结果/EIR agegroup7 update.xlsx",rowNames=T)
 
 Coefficient3<-matrix(0,nrow=32,ncol=6)
 Coefficient3<-as.data.frame(Coefficient3)
@@ -590,12 +481,11 @@ Coefficient3[32,5]<-paste0(sprintf("%0.3f",mvall3$coefficients[2,1])," (",
                            sprintf("%0.3f",mvall3$coefficients[2,1]-1.96*mvall3$coefficients[2,2]),
                            ", ",sprintf("%0.3f",mvall3$coefficients[2,1]+1.96*mvall3$coefficients[2,2]),")")
 Coefficient3[32,6]<-round(mvall3$coefficients[2,4],3)
-#write.xlsx(Coefficient3,file ="D:/研究生/乙肝干预/全国研究/二版结果/Beta agegroup7 update.xlsx",rowNames=T)
 
 mvall.3<-mvall
 mvall3<-mvmeta(yori3[-c(1,2,9,14,26),]~1, Sori3[-c(1,2,9,14,26)], method="reml")
 #######################Age group 8, only 2002 intervention###############################
-setwd("D:/研究生/乙肝干预/全国研究")
+setwd("D:/~")
 Hepatitis.B.agegroup8<-read.xlsx("agegroup8.xlsx")
 Hepatitis.B.agegroup8$Month.factor<-factor(Hepatitis.B.agegroup8$Month)
 Hepatitis.B.agegroup8$Time<-rep(c(0:179),31)
@@ -611,9 +501,7 @@ for(i in c(1:31))
 {sub.data<-Hepatitis.B.agegroup8[which(Hepatitis.B.agegroup8$Order==i),]
 mfirst<-gam(Case~ offset(log(Population.book))+Intervention.2002+Time+
               ns(Temperature,df=3)+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
-              Holiday+Interaction.2002,#+Holiday+GDP+Birth_Rate
+              Holiday+Interaction.2002,
             family=quasipoisson(link='log'), data=sub.data)
 lengthfun<-length(summary(mfirst)$p.coeff)
 yori4[i,c(1:2)] <- as.data.frame(summary(mfirst)$p.coeff)[c(2,lengthfun),1]
@@ -625,7 +513,6 @@ mvall4<-mvmeta(yori4[-c(1,2,9,14,26),]~1, Sori4[-c(1,2,9,14,26)], method="reml")
 summary(mvall4)
 
 ER4<-ER.meta.2002(mvall4,4)
-#write.xlsx(ER4,file ="D:/研究生/乙肝干预/全国研究/二版结果/ER meta agegroup8 update.xlsx")
 ER4$ER.lower<-as.numeric(ER4$ER.lower)
 ER4$ER.upper<-as.numeric(ER4$ER.upper)
 ER4$ER<-as.numeric(ER4$ER)
@@ -639,7 +526,6 @@ EIR4$EC.low<-sprintf("%0.0f",EIR4$EC.low)
 EIR4$EIR.low<-sprintf("%0.2f",EIR4$EIR.low)
 EIR4$EC.high<-sprintf("%0.0f",EIR4$EC.high)
 EIR4$EIR.high<-sprintf("%0.2f",EIR4$EIR.high)
-#write.xlsx(EIR4,file ="D:/研究生/乙肝干预/全国研究/二版结果/EIR agegroup8 update.xlsx",rowNames=T)
 
 Coefficient4<-matrix(0,nrow=32,ncol=6)
 Coefficient4<-as.data.frame(Coefficient4)
@@ -681,12 +567,11 @@ Coefficient4[32,5]<-paste0(sprintf("%0.3f",mvall4$coefficients[2,1])," (",
                            sprintf("%0.3f",mvall4$coefficients[2,1]-1.96*mvall4$coefficients[2,2]),
                            ", ",sprintf("%0.3f",mvall4$coefficients[2,1]+1.96*mvall4$coefficients[2,2]),")")
 Coefficient4[32,6]<-round(mvall4$coefficients[2,4],3)
-#write.xlsx(Coefficient4,file ="D:/研究生/乙肝干预/全国研究/二版结果/Beta agegroup8 update.xlsx",rowNames=T)
 
 mvall.4<-mvall
 mvall4<-mvmeta(yori4[-c(1,2,9,14,26),]~1, Sori4[-c(1,2,9,14,26)], method="reml")
 #######################Age group 9, both 2002 and 2009 intervention########################
-setwd("D:/研究生/乙肝干预/全国研究")
+setwd("D:/~")
 Hepatitis.B.agegroup9<-read.xlsx("agegroup9.xlsx")
 Hepatitis.B.agegroup9$Month.factor<-factor(Hepatitis.B.agegroup9$Month)
 Hepatitis.B.agegroup9$Time<-rep(c(0:179),31)
@@ -710,9 +595,7 @@ for(i in c(1:31))
 {sub.data<-Hepatitis.B.agegroup9[which(Hepatitis.B.agegroup9$Order==i),]
 mfirst<-gam(Case~ offset(log(Population.book))+Intervention.2002+Intervention.2009+
               Time+ns(Temperature,df=3)+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
-              Holiday+Interaction.2002+Interaction.2009,#+Holiday+GDP+Birth_Rate
+              Holiday+Interaction.2002+Interaction.2009,
             family=quasipoisson(link='log'), data=sub.data)
 lengthfun<-length(summary(mfirst)$p.coeff)
 yori5.1[i,c(1:2)] <- as.data.frame(summary(mfirst)$p.coeff)[c(2,lengthfun-1),1]
@@ -727,7 +610,6 @@ mvall5.1<-mvmeta(yori5.1[-c(1,2,9,14,26),]~1, Sori5.1[-c(1,2,9,14,26)], method="
 summary(mvall5.1)
 
 ER5.1<-ER.meta.2002(mvall5.1,5)
-#write.xlsx(ER5.1,file ="D:/研究生/乙肝干预/全国研究/二版结果/ER meta agegroup9.2 update.xlsx")
 ER5.1$ER.lower<-as.numeric(ER5.1$ER.lower)
 ER5.1$ER.upper<-as.numeric(ER5.1$ER.upper)
 ER5.1$ER<-as.numeric(ER5.1$ER)
@@ -741,28 +623,8 @@ EIR5.1$EC.low<-sprintf("%0.0f",EIR5.1$EC.low)
 EIR5.1$EIR.low<-sprintf("%0.2f",EIR5.1$EIR.low)
 EIR5.1$EC.high<-sprintf("%0.0f",EIR5.1$EC.high)
 EIR5.1$EIR.high<-sprintf("%0.2f",EIR5.1$EIR.high)
-#write.xlsx(EIR5.1,file ="D:/研究生/乙肝干预/全国研究/二版结果/EIR agegroup9.2 update.xlsx",rowNames=T)
 
-#ER of 2009 intervention
-mvall5.2<-mvmeta(yori5.2[-c(1,2,5,9,11,12,14,15,21,25,26),]~1, Sori5.2[-c(1,2,5,9,11,12,14,15,21,25,26)], method="reml")
-summary(mvall5.2)
-
-ER5.2<-ER.meta.2009(mvall5.2,1,59,2009)
-#write.xlsx(ER5.2,file ="D:/研究生/乙肝干预/全国研究/二版结果/ER meta agegroup9.1 update.xlsx")
-ER5.2$ER.lower<-as.numeric(ER5.2$ER.lower)
-ER5.2$ER.upper<-as.numeric(ER5.2$ER.upper)
-ER5.2$ER<-as.numeric(ER5.2$ER)
-
-EIR5.2<-EIR.2009(c(3,4,6:8,10,13,16:20,22:24,27:31),Hepatitis.B.agegroup9,"model5",c(3,11),2/12,10000)
-EIR5.2<-data.frame(EIR5.2)
-EIR5.2$EC.point<-sprintf("%0.0f",EIR5.2$EC.point)
-EIR5.2$Population<-sprintf("%0.0f",EIR5.2$Population)
-EIR5.2$EIR.point<-sprintf("%0.2f",EIR5.2$EIR.point)
-EIR5.2$EC.low<-sprintf("%0.0f",EIR5.2$EC.low)
-EIR5.2$EIR.low<-sprintf("%0.2f",EIR5.2$EIR.low)
-EIR5.2$EC.high<-sprintf("%0.0f",EIR5.2$EC.high)
-EIR5.2$EIR.high<-sprintf("%0.2f",EIR5.2$EIR.high)
-#write.xlsx(EIR5.2,file ="D:/研究生/乙肝干预/全国研究/二版结果/EIR agegroup9.1 update.xlsx",rowNames=T)
+#Without the further estimation of the 2009 intervention effectiveness among the childrend aged 8y
 
 #Save the cofficients β of 2002
 Coefficient5.1<-matrix(0,nrow=32,ncol=6)
@@ -805,56 +667,11 @@ Coefficient5.1[32,5]<-paste0(sprintf("%0.3f",mvall5.1$coefficients[2,1])," (",
                              sprintf("%0.3f",mvall5.1$coefficients[2,1]-1.96*mvall5.1$coefficients[2,2]),
                              ", ",sprintf("%0.3f",mvall5.1$coefficients[2,1]+1.96*mvall5.1$coefficients[2,2]),")")
 Coefficient5.1[32,6]<-round(mvall5.1$coefficients[2,4],3)
-#write.xlsx(Coefficient5.1,file ="D:/研究生/乙肝干预/全国研究/二版结果/Beta agegroup9.1 update.xlsx",rowNames=T)
-
-#Save the cofficients β of 2009
-Coefficient5.2<-matrix(0,nrow=32,ncol=6)
-Coefficient5.2<-as.data.frame(Coefficient5.2)
-colnames(Coefficient5.2)<-c("Age","PLADs","RR1 (95%CI)","RR2 (95%CI)","RR3 (95%CI)","Trend")
-Coefficient5.2$Age<-c("8")
-yori<-matrix(0,length(datalist),1,dimnames=list(regions, paste("beta",1,sep="")))
-Sori<-vector("list", length(datalist)); names(Sori) <- regions
-for (i in 1:31)
-{model.number<-eval(parse(text=paste("model5.",i,sep="")))
-Point1<-model.number$coefficients[3]
-Se1<-summary(model.number)$se[3]
-Point2<-model.number$coefficients[4]
-Se2<-summary(model.number)$se[4]
-length.coef<-length(model.number$coefficients)
-Point3<-model.number$coefficients[length.coef]
-Se3<-summary(model.number)$se[length.coef]
-Coefficient5.2[i,2]<-Name[i]
-Coefficient5.2[i,3]<-paste0(sprintf("%0.3f",Point1)," (",sprintf("%0.3f",Point1-1.96*Se1),
-                            ", ",sprintf("%0.3f",Point1+1.96*Se1),")")
-Coefficient5.2[i,4]<-paste0(sprintf("%0.3f",Point2)," (",sprintf("%0.3f",Point2-1.96*Se2),
-                            ", ",sprintf("%0.3f",Point2+1.96*Se2),")") 
-Coefficient5.2[i,5]<-paste0(sprintf("%0.3f",Point3)," (",sprintf("%0.3f",Point3-1.96*Se3),
-                            ", ",sprintf("%0.3f",Point3+1.96*Se3),")")
-Coefficient5.2[i,6]<-round(summary(model.number)$p.pv[length.coef],3)
-yori[i,]<-as.data.frame(summary(model.number)$p.coeff)[c(4),1]
-Sori[[i]]<-vcov(model.number)[c(4),c(4)]
-}
-mvall<-mvmeta(yori[c(3,4,6:8,10,13,16:20,22:24,27:31),]~1, Sori[c(3,4,6:8,10,13,16:20,22:24,27:31)], method="reml")
-mvall<-summary(mvall)
-mvall5.2<-summary(mvall5.2)
-Coefficient5.2[32,2]<-c("Chinese mainland")
-Coefficient5.2[32,4]<-paste0(sprintf("%0.3f",mvall$coefficients[1])," (",
-                             sprintf("%0.3f",mvall$coefficients[1]-1.96*mvall$coefficients[2]),
-                             ", ",sprintf("%0.3f",mvall$coefficients[1]+1.96*mvall$coefficients[2]),")")
-Coefficient5.2[32,3]<-paste0(sprintf("%0.3f",mvall5.2$coefficients[1,1])," (",
-                             sprintf("%0.3f",mvall5.2$coefficients[1,1]-1.96*mvall5.2$coefficients[1,2]),
-                             ", ",sprintf("%0.3f",mvall5.2$coefficients[1,1]+1.96*mvall5.2$coefficients[1,2]),")")
-Coefficient5.2[32,5]<-paste0(sprintf("%0.3f",mvall5.2$coefficients[2,1])," (",
-                             sprintf("%0.3f",mvall5.2$coefficients[2,1]-1.96*mvall5.2$coefficients[2,2]),
-                             ", ",sprintf("%0.3f",mvall5.2$coefficients[2,1]+1.96*mvall5.2$coefficients[2,2]),")")
-Coefficient5.2[32,6]<-round(mvall5.2$coefficients[2,4],3)
-#write.xlsx(Coefficient5.2,file ="D:/研究生/乙肝干预/全国研究/二版结果/Beta agegroup9.2 update.xlsx",rowNames=T)
 
 mvall.5<-mvall
 mvall5.1<-mvmeta(yori5.1[-c(1,2,9,14,26),]~1, Sori5.1[-c(1,2,9,14,26)], method="reml")
-mvall5.2<-mvmeta(yori5.2[c(3,4,6:8,10,13,16:20,22:24,27:31),]~1, Sori5.2[c(3,4,6:8,10,13,16:20,22:24,27:31)], method="reml")
 #######################Age group 10, both 2002 and 2009 intervention#######################
-setwd("D:/研究生/乙肝干预/全国研究")
+setwd("D:/~")
 Hepatitis.B.agegroup10<-read.xlsx("agegroup10.xlsx")
 Hepatitis.B.agegroup10$Month.factor<-factor(Hepatitis.B.agegroup10$Month)
 Hepatitis.B.agegroup10$Time<-rep(c(0:179),31)
@@ -874,9 +691,7 @@ for(i in c(1:31))
 {sub.data<-Hepatitis.B.agegroup10[which(Hepatitis.B.agegroup10$Order==i),]
 mfirst<-gam(Case~ offset(log(Population.book))+Intervention.2002+Intervention.2009+
               Time+ns(Temperature,df=3)+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
-              Holiday+Interaction.2002+Interaction.2009,#+Holiday+GDP+Birth_Rate
+              Holiday+Interaction.2002+Interaction.2009,
             family=quasipoisson(link='log'), data=sub.data)
 lengthfun<-length(summary(mfirst)$p.coeff)
 yori6.1[i,c(1:2)] <- as.data.frame(summary(mfirst)$p.coeff)[c(2,lengthfun-1),1]
@@ -890,7 +705,6 @@ mvall6.1<-mvmeta(yori6.1[-c(1,2,9,14,26),]~1, Sori6.1[-c(1,2,9,14,26)], method="
 summary(mvall6.1)
 
 ER6.1<-ER.meta.2002(mvall6.1,6)
-#write.xlsx(ER6.1,file ="D:/研究生/乙肝干预/全国研究/二版结果/ER meta agegroup10.2 update.xlsx")
 ER6.1$ER.lower<-as.numeric(ER6.1$ER.lower)
 ER6.1$ER.upper<-as.numeric(ER6.1$ER.upper)
 ER6.1$ER<-as.numeric(ER6.1$ER)
@@ -904,18 +718,16 @@ EIR6.1$EC.low<-sprintf("%0.0f",EIR6.1$EC.low)
 EIR6.1$EIR.low<-sprintf("%0.2f",EIR6.1$EIR.low)
 EIR6.1$EC.high<-sprintf("%0.0f",EIR6.1$EC.high)
 EIR6.1$EIR.high<-sprintf("%0.2f",EIR6.1$EIR.high)
-#write.xlsx(EIR6.1,file ="D:/研究生/乙肝干预/全国研究/二版结果/EIR agegroup10.2 update.xlsx",rowNames=T)
 
 mvall6.2<-mvmeta(yori6.2[-c(1,2,9,14,26),]~1, Sori6.2[-c(1,2,9,14,26)], method="reml")
 summary(mvall6.2)
 
 ER6.2<-ER.meta.2009(mvall6.2,2,59,2009)
-#write.xlsx(ER6.2,file ="D:/研究生/乙肝干预/全国研究/二版结果/ER meta agegroup10.1 update.xlsx")
 ER6.2$ER.lower<-as.numeric(ER6.2$ER.lower)
 ER6.2$ER.upper<-as.numeric(ER6.2$ER.upper)
 ER6.2$ER<-as.numeric(ER6.2$ER)
 
-EIR6.2<-EIR.2009(c(3:8,10:13,15:25,27:31),Hepatitis.B.agegroup10,"model6",c(3,11),(2+12)/12,10000)
+EIR6.2<-EIR.2009(c(3:8,10:13,15:25,27:31),Hepatitis.B.agegroup10,"model6",c(3,11),(2+1*12)/12,10000)
 EIR6.2<-data.frame(EIR6.2)
 EIR6.2$EC.point<-sprintf("%0.0f",EIR6.2$EC.point)
 EIR6.2$Population<-sprintf("%0.0f",EIR6.2$Population)
@@ -924,7 +736,6 @@ EIR6.2$EC.low<-sprintf("%0.0f",EIR6.2$EC.low)
 EIR6.2$EIR.low<-sprintf("%0.2f",EIR6.2$EIR.low)
 EIR6.2$EC.high<-sprintf("%0.0f",EIR6.2$EC.high)
 EIR6.2$EIR.high<-sprintf("%0.2f",EIR6.2$EIR.high)
-#write.xlsx(EIR6.2,file ="D:/研究生/乙肝干预/全国研究/二版结果/EIR agegroup10.1 update.xlsx",rowNames=T)
 
 Coefficient6.1<-matrix(0,nrow=32,ncol=6)
 Coefficient6.1<-as.data.frame(Coefficient6.1)
@@ -966,7 +777,6 @@ Coefficient6.1[32,5]<-paste0(sprintf("%0.3f",mvall6.1$coefficients[2,1])," (",
                              sprintf("%0.3f",mvall6.1$coefficients[2,1]-1.96*mvall6.1$coefficients[2,2]),
                              ", ",sprintf("%0.3f",mvall6.1$coefficients[2,1]+1.96*mvall6.1$coefficients[2,2]),")")
 Coefficient6.1[32,6]<-round(mvall6.1$coefficients[2,4],3)
-#write.xlsx(Coefficient6.1,file ="D:/研究生/乙肝干预/全国研究/二版结果/Beta agegroup10.1 update.xlsx",rowNames=T)
 
 Coefficient6.2<-matrix(0,nrow=32,ncol=6)
 Coefficient6.2<-as.data.frame(Coefficient6.2)
@@ -1008,13 +818,12 @@ Coefficient6.2[32,5]<-paste0(sprintf("%0.3f",mvall6.2$coefficients[2,1])," (",
                              sprintf("%0.3f",mvall6.2$coefficients[2,1]-1.96*mvall6.2$coefficients[2,2]),
                              ", ",sprintf("%0.3f",mvall6.2$coefficients[2,1]+1.96*mvall6.2$coefficients[2,2]),")")
 Coefficient6.2[32,6]<-round(mvall6.2$coefficients[2,4],3)
-#write.xlsx(Coefficient6.2,file ="D:/研究生/乙肝干预/全国研究/二版结果/Beta agegroup10.2 update.xlsx",rowNames=T)
 
 mvall.6<-mvall
 mvall6.1<-mvmeta(yori6.1[-c(1,2,9,14,26),]~1, Sori6.1[-c(1,2,9,14,26)], method="reml")
 mvall6.2<-mvmeta(yori6.2[-c(1,2,9,14,26),]~1, Sori6.2[-c(1,2,9,14,26)], method="reml")
 #######################Age group 11, both 2002 and 2009 intervention#######################
-setwd("D:/研究生/乙肝干预/全国研究")
+setwd("D:/~")
 Hepatitis.B.agegroup11<-read.xlsx("agegroup11.xlsx")
 Hepatitis.B.agegroup11$Month.factor<-factor(Hepatitis.B.agegroup11$Month)
 Hepatitis.B.agegroup11$Time<-rep(c(0:179),31)
@@ -1037,9 +846,7 @@ for(i in c(1:31))
 {sub.data<-Hepatitis.B.agegroup11[which(Hepatitis.B.agegroup11$Order==i),]
 mfirst<-gam(Case~ offset(log(Population.book))+Intervention.2002+Intervention.2009+
               Time+ns(Temperature,df=3)+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
-              Holiday+Interaction.2002+Interaction.2009,#+Holiday+GDP+Birth_Rate
+              Holiday+Interaction.2002+Interaction.2009,
             family=quasipoisson(link='log'), data=sub.data)
 lengthfun<-length(summary(mfirst)$p.coeff)
 yori7.1[i,c(1:2)] <- as.data.frame(summary(mfirst)$p.coeff)[c(2,lengthfun-1),1]
@@ -1053,7 +860,6 @@ mvall7.1<-mvmeta(yori7.1~1, Sori7.1, method="reml")
 summary(mvall7.1)
 
 ER7.1<-ER.meta.2002(mvall7.1,7)
-#write.xlsx(ER7.1,file ="D:/研究生/乙肝干预/全国研究/二版结果/ER meta agegroup11.2 update.xlsx")
 ER7.1$ER.lower<-as.numeric(ER7.1$ER.lower)
 ER7.1$ER.upper<-as.numeric(ER7.1$ER.upper)
 ER7.1$ER<-as.numeric(ER7.1$ER)
@@ -1067,13 +873,11 @@ EIR7.1$EC.low<-sprintf("%0.0f",EIR7.1$EC.low)
 EIR7.1$EIR.low<-sprintf("%0.2f",EIR7.1$EIR.low)
 EIR7.1$EC.high<-sprintf("%0.0f",EIR7.1$EC.high)
 EIR7.1$EIR.high<-sprintf("%0.2f",EIR7.1$EIR.high)
-#write.xlsx(EIR7.1,file ="D:/研究生/乙肝干预/全国研究/二版结果/EIR agegroup11.2 update.xlsx",rowNames=T)
 
 mvall7.2<-mvmeta(yori7.2~1, Sori7.2, method="reml")
 summary(mvall7.2)
 
 ER7.2<-ER.meta.2009(mvall7.2,3,59,2009)
-#write.xlsx(ER7.2,file ="D:/研究生/乙肝干预/全国研究/二版结果/ER meta agegroup11.1 update.xlsx")
 ER7.2$ER.lower<-as.numeric(ER7.2$ER.lower)
 ER7.2$ER.upper<-as.numeric(ER7.2$ER.upper)
 ER7.2$ER<-as.numeric(ER7.2$ER)
@@ -1087,7 +891,6 @@ EIR7.2$EC.low<-sprintf("%0.0f",EIR7.2$EC.low)
 EIR7.2$EIR.low<-sprintf("%0.2f",EIR7.2$EIR.low)
 EIR7.2$EC.high<-sprintf("%0.0f",EIR7.2$EC.high)
 EIR7.2$EIR.high<-sprintf("%0.2f",EIR7.2$EIR.high)
-#write.xlsx(EIR7.2,file ="D:/研究生/乙肝干预/全国研究/二版结果/EIR agegroup11.1 update.xlsx",rowNames=T)
 
 Coefficient7.1<-matrix(0,nrow=32,ncol=6)
 Coefficient7.1<-as.data.frame(Coefficient7.1)
@@ -1129,7 +932,6 @@ Coefficient7.1[32,5]<-paste0(sprintf("%0.3f",mvall7.1$coefficients[2,1])," (",
                              sprintf("%0.3f",mvall7.1$coefficients[2,1]-1.96*mvall7.1$coefficients[2,2]),
                              ", ",sprintf("%0.3f",mvall7.1$coefficients[2,1]+1.96*mvall7.1$coefficients[2,2]),")")
 Coefficient7.1[32,6]<-round(mvall7.1$coefficients[2,4],3)
-#write.xlsx(Coefficient7.1,file ="D:/研究生/乙肝干预/全国研究/二版结果/Beta agegroup11.1 update.xlsx",rowNames=T)
 
 Coefficient7.2<-matrix(0,nrow=32,ncol=6)
 Coefficient7.2<-as.data.frame(Coefficient7.2)
@@ -1171,13 +973,12 @@ Coefficient7.2[32,5]<-paste0(sprintf("%0.3f",mvall7.2$coefficients[2,1])," (",
                              sprintf("%0.3f",mvall7.2$coefficients[2,1]-1.96*mvall7.2$coefficients[2,2]),
                              ", ",sprintf("%0.3f",mvall7.2$coefficients[2,1]+1.96*mvall7.2$coefficients[2,2]),")")
 Coefficient7.2[32,6]<-round(mvall7.2$coefficients[2,4],3)
-#write.xlsx(Coefficient7.2,file ="D:/研究生/乙肝干预/全国研究/二版结果/Beta agegroup11.2 update.xlsx",rowNames=T)
 
 mvall.7<-mvall
 mvall7.1<-mvmeta(yori7.1~1, Sori7.1, method="reml")
 mvall7.2<-mvmeta(yori7.2~1, Sori7.2, method="reml")
 #######################Age group 12, both 2002 and 2009 intervention#######################
-setwd("D:/研究生/乙肝干预/全国研究")
+setwd("D:/~")
 Hepatitis.B.agegroup12<-read.xlsx("agegroup12.xlsx")
 Hepatitis.B.agegroup12$Month.factor<-factor(Hepatitis.B.agegroup12$Month)
 Hepatitis.B.agegroup12$Time<-rep(c(0:179),31)
@@ -1197,9 +998,7 @@ for(i in c(1:31))
 {sub.data<-Hepatitis.B.agegroup12[which(Hepatitis.B.agegroup12$Order==i),]
 mfirst<-gam(Case~ offset(log(Population.book))+Intervention.2002+Intervention.2009+
               Time+ns(Temperature,df=3)+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
-              Holiday+Interaction.2002+Interaction.2009,#+Holiday+GDP+Birth_Rate
+              Holiday+Interaction.2002+Interaction.2009,
             family=quasipoisson(link='log'), data=sub.data)
 lengthfun<-length(summary(mfirst)$p.coeff)
 yori8.1[i,c(1:2)] <- as.data.frame(summary(mfirst)$p.coeff)[c(2,lengthfun-1),1]
@@ -1213,7 +1012,6 @@ mvall8.1<-mvmeta(yori8.1~1, Sori8.1, method="reml")
 summary(mvall8.1)
 
 ER8.1<-ER.meta.2002(mvall8.1,12)
-#write.xlsx(ER8.1,file ="D:/研究生/乙肝干预/全国研究/二版结果/ER meta agegroup12.2 update.xlsx")
 ER8.1$ER.lower<-as.numeric(ER8.1$ER.lower)
 ER8.1$ER.upper<-as.numeric(ER8.1$ER.upper)
 ER8.1$ER<-as.numeric(ER8.1$ER)
@@ -1227,13 +1025,11 @@ EIR8.1$EC.low<-sprintf("%0.0f",EIR8.1$EC.low)
 EIR8.1$EIR.low<-sprintf("%0.2f",EIR8.1$EIR.low)
 EIR8.1$EC.high<-sprintf("%0.0f",EIR8.1$EC.high)
 EIR8.1$EIR.high<-sprintf("%0.2f",EIR8.1$EIR.high)
-#write.xlsx(EIR8.1,file ="D:/研究生/乙肝干预/全国研究/二版结果/EIR agegroup12.2 update.xlsx",rowNames=T)
 
 mvall8.2<-mvmeta(yori8.2~1, Sori8.2, method="reml")
 summary(mvall8.2)
 
 ER8.2<-ER.meta.2009(mvall8.2,8,59,2009)
-#write.xlsx(ER8.2,file ="D:/研究生/乙肝干预/全国研究/二版结果/ER meta agegroup12.1 update.xlsx")
 ER8.2$ER.lower<-as.numeric(ER8.2$ER.lower)
 ER8.2$ER.upper<-as.numeric(ER8.2$ER.upper)
 ER8.2$ER<-as.numeric(ER8.2$ER)
@@ -1247,7 +1043,6 @@ EIR8.2$EC.low<-sprintf("%0.0f",EIR8.2$EC.low)
 EIR8.2$EIR.low<-sprintf("%0.2f",EIR8.2$EIR.low)
 EIR8.2$EC.high<-sprintf("%0.0f",EIR8.2$EC.high)
 EIR8.2$EIR.high<-sprintf("%0.2f",EIR8.2$EIR.high)
-#write.xlsx(EIR8.2,file ="D:/研究生/乙肝干预/全国研究/二版结果/EIR agegroup12.1 update.xlsx",rowNames=T)
 
 #Calculating the weights with proportion of population size and the standardised errors for each age group
 Age.pop2<-mean(aggregate(Population.book~Time,
@@ -1283,13 +1078,9 @@ Age.pop6<-mean(aggregate(Population.book~Time,
 Age.pop7<-mean(aggregate(Population.book~Time,data=Hepatitis.B.agegroup11,FUN=sum)[,2])
 Age.pop8<-mean(aggregate(Population.book~Time,data=Hepatitis.B.agegroup12,FUN=sum)[,2])
 Age.pop<-c(Age.pop2,Age.pop3,Age.pop4,Age.pop5,Age.pop6,Age.pop7,Age.pop8)
-Sd<-1/c(prod(diag(mvall2$vcov)),
-        prod(diag(mvall3$vcov)),prod(diag(mvall4$vcov)),
-        prod(diag(mvall5.1$vcov)),prod(diag(mvall6.1$vcov)),
-        prod(diag(mvall7.1$vcov)),prod(diag(mvall8.1$vcov)))
-Prop.pop<-c(Age.pop2*Sd[1]/sum(Age.pop*Sd),Age.pop3*Sd[2]/sum(Age.pop*Sd),Age.pop4*Sd[3]/sum(Age.pop*Sd),
-            Age.pop5*Sd[4]/sum(Age.pop*Sd),Age.pop6*Sd[5]/sum(Age.pop*Sd),Age.pop7*Sd[6]/sum(Age.pop*Sd),
-            Age.pop8*Sd[7]/sum(Age.pop*Sd))
+Prop.pop<-c(Age.pop2/sum(Age.pop),Age.pop3/sum(Age.pop),Age.pop4/sum(Age.pop),
+            Age.pop5/sum(Age.pop),Age.pop6/sum(Age.pop),Age.pop7/sum(Age.pop),
+            Age.pop8/sum(Age.pop))
 Merge.coef<-Prop.pop[1]*mvall2$coefficients+Prop.pop[2]*mvall3$coefficients+
   Prop.pop[3]*mvall4$coefficients+Prop.pop[4]*mvall5.1$coefficients+
   Prop.pop[5]*mvall6.1$coefficients+Prop.pop[6]*mvall7.1$coefficients+
@@ -1299,7 +1090,7 @@ Merge.vcov<-Prop.pop[1]^2*mvall2$vcov+Prop.pop[2]^2*mvall3$vcov+
   Prop.pop[5]^2*mvall6.1$vcov+Prop.pop[6]^2*mvall7.1$vcov+
   Prop.pop[7]^2*mvall8.1$vcov
 
-#Age-standardized ERs
+#Age-standardized ERs for 2002 intervention
 coef.meta<-as.matrix(t(Merge.coef))
 time.meta<-as.matrix(cbind(rep(1,180+3*12),c(1:(180+3*12))-1))
 cov.meta<-Merge.vcov
@@ -1323,7 +1114,6 @@ ER<-data.frame(Time=month.meta,ER=ER.meta,ER.lower=ER.low.meta,ER.upper=ER.high.
 ER$ER<-sprintf("%0.2f",ER$ER)
 ER$ER.lower<-sprintf("%0.2f",ER$ER.lower)
 ER$ER.upper<-sprintf("%0.2f",ER$ER.upper)
-#write.xlsx(ER,file ="D:/研究生/乙肝干预/全国研究/二版结果/ER meta 2002 update.xlsx")
 
 Coefficient8.1<-matrix(0,nrow=32,ncol=6)
 Coefficient8.1<-as.data.frame(Coefficient8.1)
@@ -1365,7 +1155,6 @@ Coefficient8.1[32,5]<-paste0(sprintf("%0.3f",mvall8.1$coefficients[2,1])," (",
                              sprintf("%0.3f",mvall8.1$coefficients[2,1]-1.96*mvall8.1$coefficients[2,2]),
                              ", ",sprintf("%0.3f",mvall8.1$coefficients[2,1]+1.96*mvall8.1$coefficients[2,2]),")")
 Coefficient8.1[32,6]<-round(mvall8.1$coefficients[2,4],3)
-#write.xlsx(Coefficient8.1,file ="D:/研究生/乙肝干预/全国研究/二版结果/Beta agegroup12.1 update.xlsx",rowNames=T)
 
 Coefficient8.2<-matrix(0,nrow=32,ncol=6)
 Coefficient8.2<-as.data.frame(Coefficient8.2)
@@ -1407,7 +1196,6 @@ Coefficient8.2[32,5]<-paste0(sprintf("%0.3f",mvall8.2$coefficients[2,1])," (",
                              sprintf("%0.3f",mvall8.2$coefficients[2,1]-1.96*mvall8.2$coefficients[2,2]),
                              ", ",sprintf("%0.3f",mvall8.2$coefficients[2,1]+1.96*mvall8.2$coefficients[2,2]),")")
 Coefficient8.2[32,6]<-round(mvall8.2$coefficients[2,4],3)
-#write.xlsx(Coefficient8.2,file ="D:/研究生/乙肝干预/全国研究/二版结果/Beta agegroup12.2 update.xlsx",rowNames=T)
 
 #Calculating the age-standardised coefficients
 mvall.8<-mvall
@@ -1438,15 +1226,12 @@ Post.vcov<-Prop.pop[1]^2*mvall2$vcov[2,2]+Prop.pop[2]^2*mvall3$vcov[2,2]+
   Prop.pop[5]^2*mvall6.1$vcov[2,2]+Prop.pop[6]^2*mvall7.1$vcov[2,2]+
   Prop.pop[7]^2*mvall8.1$vcov[2,2]
 Post.se<-sqrt(Post.vcov)
-#-0.009 (-0.011, -0.008)
 Pre.2002<-paste0(sprintf("%0.3f",Pre.coef)," (",
                  sprintf("%0.3f",Pre.coef-1.96*Pre.se),
                  ", ",sprintf("%0.3f",Pre.coef+1.96*Pre.se),")")
-#-0.002 (-0.004, 0.001)
 Post.2002<-paste0(sprintf("%0.3f",Post.coef)," (",
                   sprintf("%0.3f",Post.coef-1.96*Post.se),
                   ", ",sprintf("%0.3f",Post.coef+1.96*Post.se),")")
-#-0.579 (-0.683, -0.475)
 Level.2002<-paste0(sprintf("%0.3f",Level.coef)," (",
                    sprintf("%0.3f",Level.coef-1.96*Level.se),
                    ", ",sprintf("%0.3f",Level.coef+1.96*Level.se),")")
@@ -1454,7 +1239,7 @@ Level.2002<-paste0(sprintf("%0.3f",Level.coef)," (",
 mvall8.2<-mvmeta(yori8.2~1, Sori8.2, method="reml")
 mvall8.1<-mvmeta(yori8.1~1, Sori8.1, method="reml")
 #######################Age group 13, only 2009 intervention##############################
-setwd("D:/研究生/乙肝干预/全国研究")
+setwd("D:/~")
 Hepatitis.B.agegroup13<-read.xlsx("Agegroup13.xlsx")
 Hepatitis.B.agegroup13$Month.factor<-factor(Hepatitis.B.agegroup13$Month)
 Hepatitis.B.agegroup13$Time<-rep(c(0:179),31)
@@ -1472,9 +1257,7 @@ for(i in c(1:31))
 {sub.data<-Hepatitis.B.agegroup13[which(Hepatitis.B.agegroup13$Order==i),]
 mfirst<-gam(Case~ offset(log(Population.book))+Intervention.2009+Time+
               ns(Temperature,df=3)+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
-              Holiday+Interaction.2009,#+Holiday+GDP+Birth_Rate
+              Holiday+Interaction.2009,
             family=quasipoisson(link='log'), data=sub.data)
 lengthfun<-length(summary(mfirst)$p.coeff)
 yori9[i,c(1:2)] <- as.data.frame(summary(mfirst)$p.coeff)[c(2,lengthfun),1]
@@ -1486,7 +1269,6 @@ mvall9<-mvmeta(yori9~1, Sori9, method="reml")
 summary(mvall9)
 
 ER9<-ER.meta.2009(mvall9,6,109,2014)
-#write.xlsx(ER9,file ="D:/研究生/乙肝干预/全国研究/二版结果/ER meta agegroup13 update.xlsx")
 ER9$ER.lower<-as.numeric(ER9$ER.lower)
 ER9$ER.upper<-as.numeric(ER9$ER.upper)
 ER9$ER<-as.numeric(ER9$ER)
@@ -1500,7 +1282,6 @@ EIR9$EC.low<-sprintf("%0.0f",EIR9$EC.low)
 EIR9$EIR.low<-sprintf("%0.2f",EIR9$EIR.low)
 EIR9$EC.high<-sprintf("%0.0f",EIR9$EC.high)
 EIR9$EIR.high<-sprintf("%0.2f",EIR9$EIR.high)
-#write.xlsx(EIR9,file ="D:/研究生/乙肝干预/全国研究/二版结果/EIR agegroup13 update.xlsx",rowNames=T)
 
 Coefficient9<-matrix(0,nrow=32,ncol=6)
 Coefficient9<-as.data.frame(Coefficient9)
@@ -1542,12 +1323,11 @@ Coefficient9[32,5]<-paste0(sprintf("%0.3f",mvall9$coefficients[2,1])," (",
                            sprintf("%0.3f",mvall9$coefficients[2,1]-1.96*mvall9$coefficients[2,2]),
                            ", ",sprintf("%0.3f",mvall9$coefficients[2,1]+1.96*mvall9$coefficients[2,2]),")")
 Coefficient9[32,6]<-round(mvall9$coefficients[2,4],3)
-#write.xlsx(Coefficient9,file ="D:/研究生/乙肝干预/全国研究/二版结果/Beta agegroup13 update.xlsx",rowNames=T)
 
 mvall.9<-mvall
 mvall9<-mvmeta(yori9~1, Sori9, method="reml")
 #######################Age group 14, only 2009 intervention##############################
-setwd("D:/研究生/乙肝干预/全国研究")
+setwd("D:/~")
 Hepatitis.B.agegroup14<-read.xlsx("Agegroup14.xlsx")
 Hepatitis.B.agegroup14$Month.factor<-factor(Hepatitis.B.agegroup14$Month)
 Hepatitis.B.agegroup14$Time<-rep(c(0:179),31)
@@ -1575,7 +1355,6 @@ mvall10<-mvmeta(yori10~1, Sori10, method="reml")
 summary(mvall10)
 
 ER10<-ER.meta.2009(mvall10,1,169,2019)
-#write.xlsx(ER10,file ="D:/研究生/乙肝干预/全国研究/二版结果/ER meta agegroup14 update.xlsx")
 ER10$ER.lower<-as.numeric(ER10$ER.lower)
 ER10$ER.upper<-as.numeric(ER10$ER.upper)
 ER10$ER<-as.numeric(ER10$ER)
@@ -1589,21 +1368,7 @@ EIR10$EC.low<-sprintf("%0.0f",EIR10$EC.low)
 EIR10$EIR.low<-sprintf("%0.2f",EIR10$EIR.low)
 EIR10$EC.high<-sprintf("%0.0f",EIR10$EC.high)
 EIR10$EIR.high<-sprintf("%0.2f",EIR10$EIR.high)
-#write.xlsx(EIR10,file ="D:/研究生/乙肝干预/全国研究/二版结果/EIR agegroup14 update.xlsx",rowNames=T)
 
-Age.pop5<-mean(aggregate(Population.book~Time,
-                         data=Hepatitis.B.agegroup9[-which(Hepatitis.B.agegroup9$Order==1 |
-                                                             Hepatitis.B.agegroup9$Order==2 |
-                                                             Hepatitis.B.agegroup9$Order==5 |
-                                                             Hepatitis.B.agegroup9$Order==9 |
-                                                             Hepatitis.B.agegroup9$Order==11 |
-                                                             Hepatitis.B.agegroup9$Order==12 |
-                                                             Hepatitis.B.agegroup9$Order==14 | 
-                                                             Hepatitis.B.agegroup9$Order==14 |
-                                                             Hepatitis.B.agegroup9$Order==15 |
-                                                             Hepatitis.B.agegroup9$Order==21 |
-                                                             Hepatitis.B.agegroup9$Order==25 |
-                                                             Hepatitis.B.agegroup9$Order==26),],FUN=sum)[,2])
 Age.pop6<-mean(aggregate(Population.book~Time,
                          data=Hepatitis.B.agegroup10[-which(Hepatitis.B.agegroup10$Order==1 |
                                                               Hepatitis.B.agegroup10$Order==2 |
@@ -1611,21 +1376,17 @@ Age.pop6<-mean(aggregate(Population.book~Time,
                                                               Hepatitis.B.agegroup10$Order==26),],FUN=sum)[,2])
 Age.pop9<-mean(aggregate(Population.book~Time,data=Hepatitis.B.agegroup13,FUN=sum)[,2])
 Age.pop10<-mean(aggregate(Population.book~Time,data=Hepatitis.B.agegroup14,FUN=sum)[,2])
-Age.pop.2009<-c(Age.pop5,Age.pop6,Age.pop7,Age.pop8,Age.pop9,Age.pop10)
-#Prop.pop.2009<-c(Age.pop5/sum(Age.pop.2009),Age.pop6/sum(Age.pop.2009),Age.pop7/sum(Age.pop.2009),
-#                 Age.pop8/sum(Age.pop.2009),Age.pop9/sum(Age.pop.2009),Age.pop10/sum(Age.pop.2009))
-Sd<-1/c(prod(diag(mvall5.2$vcov)),prod(diag(mvall6.2$vcov)),
-        prod(diag(mvall7.2$vcov)),prod(diag(mvall8.2$vcov)),
-        prod(diag(mvall9$vcov)),prod(diag(mvall10$vcov)))
-Prop.pop.2009<-c(Age.pop5*Sd[1]/sum(Age.pop.2009*Sd),Age.pop6*Sd[2]/sum(Age.pop.2009*Sd),Age.pop7*Sd[3]/sum(Age.pop.2009*Sd),
-                 Age.pop8*Sd[4]/sum(Age.pop.2009*Sd),Age.pop9*Sd[5]/sum(Age.pop.2009*Sd),Age.pop10*Sd[6]/sum(Age.pop.2009*Sd))
-Merge.coef.2009<-Prop.pop.2009[1]*mvall5.2$coefficients+Prop.pop.2009[2]*mvall6.2$coefficients+
-  Prop.pop.2009[3]*mvall7.2$coefficients+Prop.pop.2009[4]*mvall8.2$coefficients+
-  Prop.pop.2009[5]*mvall9$coefficients+Prop.pop.2009[6]*mvall10$coefficients
-Merge.vcov.2009<-Prop.pop.2009[1]^2*mvall5.2$vcov+Prop.pop.2009[2]^2*mvall6.2$vcov+
-  Prop.pop.2009[3]^2*mvall7.2$vcov+Prop.pop.2009[4]^2*mvall8.2$vcov+
-  Prop.pop.2009[5]^2*mvall9$vcov+Prop.pop.2009[6]^2*mvall10$vcov
+Age.pop.2009<-c(Age.pop6,Age.pop7,Age.pop8,Age.pop9,Age.pop10)
+Prop.pop.2009<-c(Age.pop6/sum(Age.pop.2009),Age.pop7/sum(Age.pop.2009),
+                 Age.pop8/sum(Age.pop.2009),Age.pop9/sum(Age.pop.2009),Age.pop10/sum(Age.pop.2009))
+Merge.coef.2009<-Prop.pop.2009[1]*mvall6.2$coefficients+
+  Prop.pop.2009[2]*mvall7.2$coefficients+Prop.pop.2009[3]*mvall8.2$coefficients+
+  Prop.pop.2009[4]*mvall9$coefficients+Prop.pop.2009[5]*mvall10$coefficients
+Merge.vcov.2009<-Prop.pop.2009[1]^2*mvall6.2$vcov+
+  Prop.pop.2009[2]^2*mvall7.2$vcov+Prop.pop.2009[3]^2*mvall8.2$vcov+
+  Prop.pop.2009[4]^2*mvall9$vcov+Prop.pop.2009[5]^2*mvall10$vcov
 
+#Age-standardized ERs for 2009 intervention
 coef.meta<-as.matrix(t(Merge.coef.2009))
 time.meta<-as.matrix(cbind(rep(1,180-7*12),c((7*12):179)-7*12))
 cov.meta<-Merge.vcov.2009
@@ -1646,42 +1407,10 @@ ER.whole.low<-ER.low.meta
 ER.whole.upper<-ER.high.meta
 month.meta<-c((7*12+1):180)
 ER<-data.frame(Time=month.meta,ER=ER.meta,ER.lower=ER.low.meta,ER.upper=ER.high.meta)
-
-plot.ER.merge2<-ggplot(ER,aes(x=Time)) +
-  geom_ribbon(aes(ymin=ER.lower,ymax=ER.upper),fill=met.brewer("Degas",8)[1],alpha=0.3)+
-  geom_line(aes(y=ER,color="ER"),linewidth=1.0)+
-  #scale_x_date(date_labels="%Y",date_breaks="1 year")+
-  scale_x_continuous(limits=c(85,181),breaks=seq(85,181,12),
-                     labels=c("0","1","2","3","4","5","6","7","8"))+
-  scale_y_continuous(limits=c(-100,100),breaks=c(-100,-50,0,50,100))+
-  xlab("Years after the intervention in 2009")+ylab("Excess risk (%)")+
-  scale_color_manual(values = met.brewer("Degas",8)[1])+
-  geom_hline(yintercept=0,lty=2)+
-  theme_bw()+
-  theme(legend.position="none",
-        axis.text=element_text(colour="black",size=13,family="serif"),
-        axis.title=element_text(size=15,color='black',family="serif"))
-
-plot.ER.merge2<-plot.ER.merge2+
-  theme(plot.title = element_text(size = 16,color = 'black',family ='serif'))+
-  ggtitle("A")
-
-plot3<-plot_grid(plot.ER.merge2,
-                 plot.ER5.2,plot.ER6.2,
-                 plot.ER7.2,plot.ER8.2,
-                 plot.ER9,plot.ER10,
-                 ncol=2,align = "vh")
-setwd("D:/研究生/乙肝干预/全国研究/二版结果")
-#tiff(file="ER 2009 all.tiff",width=360,height=360,units="mm",res=300,compression="lzw")
-#print(plot3)
-#dev.off()
-
 ER$ER<-sprintf("%0.2f",ER$ER)
 ER$ER.lower<-sprintf("%0.2f",ER$ER.lower)
 ER$ER.upper<-sprintf("%0.2f",ER$ER.upper)
-#write.xlsx(ER,file ="D:/研究生/乙肝干预/全国研究/二版结果/ER meta 2009 update.xlsx")
 
-#参数保存
 Coefficient10<-matrix(0,nrow=32,ncol=6)
 Coefficient10<-as.data.frame(Coefficient10)
 colnames(Coefficient10)<-c("Age","PLADs","RR1 (95%CI)","RR2 (95%CI)","RR3 (95%CI)","Trend")
@@ -1709,7 +1438,6 @@ yori[i,]<-as.data.frame(summary(model.number)$p.coeff)[c(3),1]
 Sori[[i]]<-vcov(model.number)[c(3),c(3)]
 }
 mvall<-mvmeta(yori~1, Sori, method="reml")
-#I2=99.6%, P<0.001
 mvall<-summary(mvall)
 mvall10<-summary(mvall10)
 Coefficient10[32,2]<-c("Chinese mainland")
@@ -1723,39 +1451,35 @@ Coefficient10[32,5]<-paste0(sprintf("%0.3f",mvall10$coefficients[2,1])," (",
                             sprintf("%0.3f",mvall10$coefficients[2,1]-1.96*mvall10$coefficients[2,2]),
                             ", ",sprintf("%0.3f",mvall10$coefficients[2,1]+1.96*mvall10$coefficients[2,2]),")")
 Coefficient10[32,6]<-round(mvall10$coefficients[2,4],3)
-#write.xlsx(Coefficient10,file ="D:/研究生/乙肝干预/全国研究/二版结果/Beta agegroup14 update.xlsx",rowNames=T)
 
 mvall.10<-mvall
-Pre.coef<-Prop.pop.2009[1]*mvall.5$coefficients[1]+Prop.pop.2009[2]*mvall.6$coefficients[1]+
-  Prop.pop.2009[3]*mvall.7$coefficients[1]+Prop.pop.2009[4]*mvall.8$coefficients[1]+
-  Prop.pop.2009[5]*mvall.9$coefficients[1]+Prop.pop.2009[6]*mvall.10$coefficients[1]
-Pre.vcov<-Prop.pop.2009[1]^2*mvall.5$vcov+Prop.pop.2009[2]^2*mvall.6$vcov+
-  Prop.pop.2009[3]^2*mvall.7$vcov+Prop.pop.2009[4]^2*mvall.8$vcov+
-  Prop.pop.2009[5]^2*mvall.9$vcov+Prop.pop.2009[6]^2*mvall.10$vcov
+Pre.coef<-Prop.pop.2009[1]*mvall.6$coefficients[1]+
+  Prop.pop.2009[2]*mvall.7$coefficients[1]+Prop.pop.2009[3]*mvall.8$coefficients[1]+
+  Prop.pop.2009[4]*mvall.9$coefficients[1]+Prop.pop.2009[5]*mvall.10$coefficients[1]
+Pre.vcov<-Prop.pop.2009[1]^2*mvall.6$vcov+
+  Prop.pop.2009[2]^2*mvall.7$vcov+Prop.pop.2009[3]^2*mvall.8$vcov+
+  Prop.pop.2009[4]^2*mvall.9$vcov+Prop.pop.2009[5]^2*mvall.10$vcov
 Pre.se<-sqrt(Pre.vcov)
-Level.coef<-Prop.pop.2009[1]*mvall5.2$coefficients[1]+Prop.pop.2009[2]*mvall6.2$coefficients[1]+
-  Prop.pop.2009[3]*mvall7.2$coefficients[1]+Prop.pop.2009[4]*mvall8.2$coefficients[1]+
-  Prop.pop.2009[5]*mvall9$coefficients[1]+Prop.pop.2009[6]*mvall10$coefficients[1]
-Level.vcov<-Prop.pop.2009[1]^2*mvall5.2$vcov[1,1]+Prop.pop.2009[2]^2*mvall6.2$vcov[1,1]+
-  Prop.pop.2009[3]^2*mvall7.2$vcov[1,1]+Prop.pop.2009[4]^2*mvall8.2$vcov[1,1]+
-  Prop.pop.2009[5]^2*mvall9$vcov[1,1]+Prop.pop.2009[6]^2*mvall10$vcov[1,1]
+Level.coef<-Prop.pop.2009[1]*mvall6.2$coefficients[1]+
+  Prop.pop.2009[2]*mvall7.2$coefficients[1]+Prop.pop.2009[5]*mvall8.2$coefficients[1]+
+  Prop.pop.2009[4]*mvall9$coefficients[1]+Prop.pop.2009[5]*mvall10$coefficients[1]
+Level.vcov<-Prop.pop.2009[1]^2*mvall6.2$vcov[1,1]+
+  Prop.pop.2009[2]^2*mvall7.2$vcov[1,1]+Prop.pop.2009[5]^2*mvall8.2$vcov[1,1]+
+  Prop.pop.2009[4]^2*mvall9$vcov[1,1]+Prop.pop.2009[5]^2*mvall10$vcov[1,1]
 Level.se<-sqrt(Level.vcov)
-Post.coef<-Prop.pop.2009[1]*mvall5.2$coefficients[2]+Prop.pop.2009[2]*mvall6.2$coefficients[2]+
-  Prop.pop.2009[3]*mvall7.2$coefficients[2]+Prop.pop.2009[4]*mvall8.2$coefficients[2]+
-  Prop.pop.2009[5]*mvall9$coefficients[2]+Prop.pop.2009[6]*mvall10$coefficients[2]
-Post.vcov<-Prop.pop.2009[1]^2*mvall5.2$vcov[2,2]+Prop.pop.2009[2]^2*mvall6.2$vcov[2,2]+
-  Prop.pop.2009[3]^2*mvall7.2$vcov[2,2]+Prop.pop.2009[4]^2*mvall8.2$vcov[2,2]+
-  Prop.pop.2009[5]^2*mvall9$vcov[2,2]+Prop.pop.2009[6]^2*mvall10$vcov[2,2]
+Post.coef<-Prop.pop.2009[1]*mvall6.2$coefficients[2]+
+  Prop.pop.2009[2]*mvall7.2$coefficients[2]+Prop.pop.2009[3]*mvall8.2$coefficients[2]+
+  Prop.pop.2009[4]*mvall9$coefficients[2]+Prop.pop.2009[5]*mvall10$coefficients[2]
+Post.vcov<-Prop.pop.2009[1]^2*mvall6.2$vcov[2,2]+
+  Prop.pop.2009[2]^2*mvall7.2$vcov[2,2]+Prop.pop.2009[3]^2*mvall8.2$vcov[2,2]+
+  Prop.pop.2009[4]^2*mvall9$vcov[2,2]+Prop.pop.2009[5]^2*mvall10$vcov[2,2]
 Post.se<-sqrt(Post.vcov)
-#-0.007 (-0.009, -0.005)
 Pre.2009<-paste0(sprintf("%0.3f",Pre.coef)," (",
                  sprintf("%0.3f",Pre.coef-1.96*Pre.se),
                  ", ",sprintf("%0.3f",Pre.coef+1.96*Pre.se),")")
-#-0.009 (-0.011, -0.006)
 Post.2009<-paste0(sprintf("%0.3f",Post.coef)," (",
                   sprintf("%0.3f",Post.coef-1.96*Post.se),
                   ", ",sprintf("%0.3f",Post.coef+1.96*Post.se),")")
-#-0.215 (-0.270, -0.161)
 Level.2009<-paste0(sprintf("%0.3f",Level.coef)," (",
                    sprintf("%0.3f",Level.coef-1.96*Level.se),
                    ", ",sprintf("%0.3f",Level.coef+1.96*Level.se),")")
@@ -1903,34 +1627,29 @@ EIR.merge.2009<-function(Sequence,database,model,Location,intervention,n.cir){
   return(EIR.mainland)
 }
 
-EIR.merge.5.2<-EIR.merge.2009(c(3,4,6:8,10,13,16:20,22:24,27:31),Hepatitis.B.agegroup9,"model5",c(3,11),2/12,10000)
 EIR.merge.6.2<-EIR.merge.2009(c(3:8,10:13,15:25,27:31),Hepatitis.B.agegroup10,"model6",c(3,11),(2+12)/12,10000)
 EIR.merge.7.2<-EIR.merge.2009(c(1:31),Hepatitis.B.agegroup11,"model7",c(3,11),(2+12*2)/12,10000)
 EIR.merge.8.2<-EIR.merge.2009(c(1:31),Hepatitis.B.agegroup12,"model8",c(3,11),(2+12*7)/12,10000)
 EIR.merge.9<-EIR.merge.2009(c(1:31),Hepatitis.B.agegroup13,"model9",c(2,9),6,10000)
 EIR.merge.10<-EIR.merge.2009(c(1:31),Hepatitis.B.agegroup14,"model10",c(2,9),1,10000)
-EIR.merge.2009<-Prop.pop.2009[1]*EIR.merge.5.2$EIR+
-  Prop.pop.2009[2]*EIR.merge.6.2$EIR+
-  Prop.pop.2009[3]*EIR.merge.7.2$EIR+
-  Prop.pop.2009[4]*EIR.merge.8.2$EIR+
-  Prop.pop.2009[5]*EIR.merge.9$EIR+
-  Prop.pop.2009[6]*EIR.merge.10$EIR
-EIR.point.2009<-Prop.pop.2009[1]*EIR.merge.5.2$Point.EIR[1]+
-  Prop.pop.2009[2]*EIR.merge.6.2$Point.EIR[1]+
-  Prop.pop.2009[3]*EIR.merge.7.2$Point.EIR[1]+
-  Prop.pop.2009[4]*EIR.merge.8.2$Point.EIR[1]+
-  Prop.pop.2009[5]*EIR.merge.9$Point.EIR[1]+
-  Prop.pop.2009[6]*EIR.merge.10$Point.EIR[1]
-#-25.04 (-26.29, -23.19)
+EIR.merge.2009<-Prop.pop.2009[1]*EIR.merge.6.2$EIR+
+  Prop.pop.2009[2]*EIR.merge.7.2$EIR+
+  Prop.pop.2009[3]*EIR.merge.8.2$EIR+
+  Prop.pop.2009[4]*EIR.merge.9$EIR+
+  Prop.pop.2009[5]*EIR.merge.10$EIR
+EIR.point.2009<-Prop.pop.2009[1]*EIR.merge.6.2$Point.EIR[1]+
+  Prop.pop.2009[2]*EIR.merge.7.2$Point.EIR[1]+
+  Prop.pop.2009[3]*EIR.merge.8.2$Point.EIR[1]+
+  Prop.pop.2009[4]*EIR.merge.9$Point.EIR[1]+
+  Prop.pop.2009[5]*EIR.merge.10$Point.EIR[1]
 EIR.2009.low<-sort(EIR.merge.2009)[n.cir*0.025]
 EIR.2009.high<-sort(EIR.merge.2009)[n.cir*0.975]
-EC.merge.2009<-EIR.merge.5.2$EC+EIR.merge.6.2$EC+
+EC.merge.2009<-EIR.merge.6.2$EC+
   EIR.merge.7.2$EC+EIR.merge.8.2$EC+
   EIR.merge.9$EC+EIR.merge.10$EC
-EC.point.2009<-EIR.merge.5.2$Point.EC[1]+EIR.merge.6.2$Point.EC[1]+
+EC.point.2009<-EIR.merge.6.2$Point.EC[1]+
   EIR.merge.7.2$Point.EC[1]+EIR.merge.8.2$Point.EC[1]+
   EIR.merge.9$Point.EC[1]+EIR.merge.10$Point.EC[1]
-#-500928 (-518333, -478437)
 EC.2009.low<-sort(EC.merge.2009)[n.cir*0.025]
 EC.2009.high<-sort(EC.merge.2009)[n.cir*0.975]
 
@@ -1942,6 +1661,114 @@ EIR<-data.frame(EC.point.2002=EC.point.2002,EC.low.2002=EC.2002.low,
                 EC.high.2009=EC.2009.high,EIR.point.2009=EIR.point.2009,
                 EIR.low.2009=EIR.2009.low,EIR.high.2009=EIR.2009.high)
 
+EIR.merge.2002<-function(Sequence,database,model,Location,intervention,n.cir){
+  set.seed(202403)
+  EMR.reserve<-matrix(0,nrow=31,ncol=8)
+  EMR.reserve.diff<-c()
+  MA.reserve<-matrix(0,nrow=n.cir,ncol=31)
+  for(i in Sequence)
+  {data.number<-database[which(database$Order==i),]
+  model.number<-eval(parse(text=paste(model,".",i,sep="")))
+  mod.number<-as.matrix(data.frame(model.matrix(model.number),offset=log(data.number$Population.book)))
+  mod.number.0<-mod.number
+  mod.number.0[,Location]<-0
+  line.row<-which(data.number$Intervention.2002==1)
+  length.row<-length(line.row)
+  freq.number<-data.number$Case[line.row]
+  pop.number<-data.number$Population.book[line.row]
+  #1对应人口
+  coef.number<-c(summary(model.number)$p.coeff,1)
+  diff.number<-exp(mod.number%*% coef.number)-exp(mod.number.0%*%coef.number)
+  diff.number<-diff.number[which(diff.number!=0)]
+  EIR.number<-sum(diff.number)/intervention/(sum(pop.number)/length(pop.number))*100000
+  EMR.reserve[i,1]<-sum(diff.number)
+  EMR.reserve[i,2]<-intervention
+  EMR.reserve[i,3]<-sum(pop.number)/length(pop.number)
+  EMR.reserve[i,4]<-EIR.number
+  #区间计算
+  coef.ini<-coef.number[Location]
+  length.coef<-length(coef.ini)
+  cov.number<-vcov(model.number)[Location,Location]
+  eigen.number<-eigen(cov.number)
+  r.norm<-rnorm(length.coef*n.cir)
+  r.norm<-matrix(r.norm,n.cir)
+  coef.sim<-coef.ini+eigen.number$vectors%*%diag(sqrt(eigen.number$values),length.coef)%*%t(r.norm)
+  for(k in 1:n.cir){
+    coef.number[Location[1]]<-coef.sim[1,k]
+    coef.number[Location[2]]<-coef.sim[2,k]
+    diff.number<-exp(mod.number%*%coef.number)-exp(mod.number.0%*%coef.number)
+    diff.number<-diff.number[which(diff.number!=0)]
+    EMR.reserve.diff[k]<-sum(diff.number)
+  }
+  MA.reserve[,i]<-EMR.reserve.diff
+  EMR.reserve[i,5]<-sort(EMR.reserve.diff)[n.cir*0.025]
+  EMR.reserve[i,7]<-sort(EMR.reserve.diff)[n.cir*0.975]
+  EMR.reserve[i,6]<-EMR.reserve[i,5]/EMR.reserve[i,2]/EMR.reserve[i,3]*100000
+  EMR.reserve[i,8]<-EMR.reserve[i,7]/EMR.reserve[i,2]/EMR.reserve[i,3]*100000
+  }
+  EMR.reserve[,2]<-intervention
+  EMR.mainland.point<-sum(EMR.reserve[Sequence,1])/mean(EMR.reserve[Sequence,2])/sum(EMR.reserve[Sequence,3])*100000
+  EMR.mainland<-rowSums(MA.reserve[,Sequence])/mean(EMR.reserve[Sequence,2])/sum(EMR.reserve[Sequence,3])*100000
+  EC.mainland<-rowSums(MA.reserve[,Sequence])
+  EIR.mainland<-data.frame(EC=EC.mainland,EIR=EMR.mainland,
+                           Point.EC=sum(EMR.reserve[Sequence,1]),
+                           Point.EIR=EMR.mainland.point)
+  return(EIR.mainland)
+}
+EIR.merge.2009<-function(Sequence,database,model,Location,intervention,n.cir){
+  set.seed(202403)
+  EMR.reserve<-matrix(0,nrow=31,ncol=8)
+  EMR.reserve.diff<-c()
+  MA.reserve<-matrix(0,nrow=n.cir,ncol=31)
+  for(i in Sequence)
+  {data.number<-database[which(database$Order==i),]
+  model.number<-eval(parse(text=paste(model,".",i,sep="")))
+  mod.number<-as.matrix(data.frame(model.matrix(model.number),offset=log(data.number$Population.book)))
+  mod.number.0<-mod.number
+  mod.number.0[,Location]<-0
+  line.row<-which(data.number$Intervention.2009==1)
+  length.row<-length(line.row)
+  freq.number<-data.number$Case[line.row]
+  pop.number<-data.number$Population.book[line.row]
+  #1对应人口
+  coef.number<-c(summary(model.number)$p.coeff,1)
+  diff.number<-exp(mod.number%*% coef.number)-exp(mod.number.0%*%coef.number)
+  diff.number<-diff.number[which(diff.number!=0)]
+  EIR.number<-sum(diff.number)/intervention/(sum(pop.number)/length(pop.number))*100000
+  EMR.reserve[i,1]<-sum(diff.number)
+  EMR.reserve[i,2]<-intervention
+  EMR.reserve[i,3]<-sum(pop.number)/length(pop.number)
+  EMR.reserve[i,4]<-EIR.number
+  #区间计算
+  coef.ini<-coef.number[Location]
+  length.coef<-length(coef.ini)
+  cov.number<-vcov(model.number)[Location,Location]
+  eigen.number<-eigen(cov.number)
+  r.norm<-rnorm(length.coef*n.cir)
+  r.norm<-matrix(r.norm,n.cir)
+  coef.sim<-coef.ini+eigen.number$vectors%*%diag(sqrt(eigen.number$values),length.coef)%*%t(r.norm)
+  for(k in 1:n.cir){
+    coef.number[Location[1]]<-coef.sim[1,k]
+    coef.number[Location[2]]<-coef.sim[2,k]
+    diff.number<-exp(mod.number%*%coef.number)-exp(mod.number.0%*%coef.number)
+    diff.number<-diff.number[which(diff.number!=0)]
+    EMR.reserve.diff[k]<-sum(diff.number)
+  }
+  MA.reserve[,i]<-EMR.reserve.diff
+  EMR.reserve[i,5]<-sort(EMR.reserve.diff)[n.cir*0.025]
+  EMR.reserve[i,7]<-sort(EMR.reserve.diff)[n.cir*0.975]
+  EMR.reserve[i,6]<-EMR.reserve[i,5]/EMR.reserve[i,2]/EMR.reserve[i,3]*100000
+  EMR.reserve[i,8]<-EMR.reserve[i,7]/EMR.reserve[i,2]/EMR.reserve[i,3]*100000
+  }
+  EMR.mainland.point<-sum(EMR.reserve[Sequence,1])/mean(EMR.reserve[Sequence,2])/sum(EMR.reserve[Sequence,3])*100000
+  EMR.mainland.point<-sum(EMR.reserve[Sequence,1])/mean(EMR.reserve[Sequence,2])/sum(EMR.reserve[Sequence,3])*100000
+  EMR.mainland<-rowSums(MA.reserve[,Sequence])/mean(EMR.reserve[Sequence,2])/sum(EMR.reserve[Sequence,3])*100000
+  EC.mainland<-rowSums(MA.reserve[,Sequence])
+  EIR.mainland<-data.frame(EC=EC.mainland,EIR=EMR.mainland,
+                           Point.EC=sum(EMR.reserve[Sequence,1]),
+                           Point.EIR=EMR.mainland.point)
+  return(EIR.mainland)
+}
 
 #######################Region subgroup EIR, 2002###################################
 #Region category
@@ -2004,7 +1831,6 @@ EIR.point.north.2002<-Prop.pop.north.2002[1]*EIR.merge.2$Point.EIR[1]+Prop.pop.n
   Prop.pop.north.2002[3]*EIR.merge.4$Point.EIR[1]+Prop.pop.north.2002[4]*EIR.merge.5.1$Point.EIR[1]+
   Prop.pop.north.2002[5]*EIR.merge.6.1$Point.EIR[1]+Prop.pop.north.2002[6]*EIR.merge.7.1$Point.EIR[1]+
   Prop.pop.north.2002[7]*EIR.merge.8.1$Point.EIR[1]
-#-19.67 (-20.87, -13.31)
 EIR.north.2002.low<-sort(EIR.merge.north.2002)[n.cir*0.025]
 EIR.north.2002.high<-sort(EIR.merge.north.2002)[n.cir*0.975]
 EC.merge.north.2002<-EIR.merge.2$EC+EIR.merge.3$EC+
@@ -2015,7 +1841,6 @@ EC.point.north.2002<-EIR.merge.2$Point.EC[1]+EIR.merge.3$Point.EC[1]+
   EIR.merge.4$Point.EC[1]+EIR.merge.5.1$Point.EC[1]+
   EIR.merge.6.1$Point.EC[1]+EIR.merge.7.1$Point.EC[1]+
   EIR.merge.8.1$Point.EC[1]
-#-40868 (-42733, -20695)
 EC.north.2002.low<-sort(EC.merge.north.2002)[n.cir*0.025]
 EC.north.2002.high<-sort(EC.merge.north.2002)[n.cir*0.975]
 
@@ -2066,7 +1891,6 @@ EIR.point.northeast.2002<-Prop.pop.northeast.2002[1]*EIR.merge.2$Point.EIR[1]+Pr
   Prop.pop.northeast.2002[3]*EIR.merge.4$Point.EIR[1]+Prop.pop.northeast.2002[4]*EIR.merge.5.1$Point.EIR[1]+
   Prop.pop.northeast.2002[5]*EIR.merge.6.1$Point.EIR[1]+Prop.pop.northeast.2002[6]*EIR.merge.7.1$Point.EIR[1]+
   Prop.pop.northeast.2002[7]*EIR.merge.8.1$Point.EIR[1]
-#-17.37 (-19.29, -12.81)
 EIR.northeast.2002.low<-sort(EIR.merge.northeast.2002)[n.cir*0.025]
 EIR.northeast.2002.high<-sort(EIR.merge.northeast.2002)[n.cir*0.975]
 EC.merge.northeast.2002<-EIR.merge.2$EC+EIR.merge.3$EC+
@@ -2077,7 +1901,6 @@ EC.point.northeast.2002<-EIR.merge.2$Point.EC[1]+EIR.merge.3$Point.EC[1]+
   EIR.merge.4$Point.EC[1]+EIR.merge.5.1$Point.EC[1]+
   EIR.merge.6.1$Point.EC[1]+EIR.merge.7.1$Point.EC[1]+
   EIR.merge.8.1$Point.EC[1]
-#-22788 (-24283, -16208)
 EC.northeast.2002.low<-sort(EC.merge.northeast.2002)[n.cir*0.025]
 EC.northeast.2002.high<-sort(EC.merge.northeast.2002)[n.cir*0.975]
 
@@ -2126,7 +1949,6 @@ EIR.point.east.2002<-Prop.pop.east.2002[1]*EIR.merge.2$Point.EIR[1]+Prop.pop.eas
   Prop.pop.east.2002[3]*EIR.merge.4$Point.EIR[1]+Prop.pop.east.2002[4]*EIR.merge.5.1$Point.EIR[1]+
   Prop.pop.east.2002[5]*EIR.merge.6.1$Point.EIR[1]+Prop.pop.east.2002[6]*EIR.merge.7.1$Point.EIR[1]+
   Prop.pop.east.2002[7]*EIR.merge.8.1$Point.EIR[1]
-#-3.91 (-4.52, 15.94)
 EIR.east.2002.low<-sort(EIR.merge.east.2002)[n.cir*0.025]
 EIR.east.2002.high<-sort(EIR.merge.east.2002)[n.cir*0.975]
 EC.merge.east.2002<-EIR.merge.2$EC+EIR.merge.3$EC+
@@ -2137,7 +1959,6 @@ EC.point.east.2002<-EIR.merge.2$Point.EC[1]+EIR.merge.3$Point.EC[1]+
   EIR.merge.4$Point.EC[1]+EIR.merge.5.1$Point.EC[1]+
   EIR.merge.6.1$Point.EC[1]+EIR.merge.7.1$Point.EC[1]+
   EIR.merge.8.1$Point.EC[1]
-#-12845 (-15036, 157952)
 EC.east.2002.low<-sort(EC.merge.east.2002)[n.cir*0.025]
 EC.east.2002.high<-sort(EC.merge.east.2002)[n.cir*0.975]
 
@@ -2182,7 +2003,6 @@ EIR.point.southcentral.2002<-Prop.pop.southcentral.2002[1]*EIR.merge.2$Point.EIR
   Prop.pop.southcentral.2002[3]*EIR.merge.4$Point.EIR[1]+Prop.pop.southcentral.2002[4]*EIR.merge.5.1$Point.EIR[1]+
   Prop.pop.southcentral.2002[5]*EIR.merge.6.1$Point.EIR[1]+Prop.pop.southcentral.2002[6]*EIR.merge.7.1$Point.EIR[1]+
   Prop.pop.southcentral.2002[7]*EIR.merge.8.1$Point.EIR[1]
-#-20.38 (-21.68, -15.79)
 EIR.southcentral.2002.low<-sort(EIR.merge.southcentral.2002)[n.cir*0.025]
 EIR.southcentral.2002.high<-sort(EIR.merge.southcentral.2002)[n.cir*0.975]
 EC.merge.southcentral.2002<-EIR.merge.2$EC+EIR.merge.3$EC+
@@ -2193,7 +2013,6 @@ EC.point.southcentral.2002<-EIR.merge.2$Point.EC[1]+EIR.merge.3$Point.EC[1]+
   EIR.merge.4$Point.EC[1]+EIR.merge.5.1$Point.EC[1]+
   EIR.merge.6.1$Point.EC[1]+EIR.merge.7.1$Point.EC[1]+
   EIR.merge.8.1$Point.EC[1]
-#-71283 (-76518, -36644)
 EC.southcentral.2002.low<-sort(EC.merge.southcentral.2002)[n.cir*0.025]
 EC.southcentral.2002.high<-sort(EC.merge.southcentral.2002)[n.cir*0.975]
 
@@ -2238,7 +2057,6 @@ EIR.point.southwest.2002<-Prop.pop.southwest.2002[1]*EIR.merge.2$Point.EIR[1]+Pr
   Prop.pop.southwest.2002[3]*EIR.merge.4$Point.EIR[1]+Prop.pop.southwest.2002[4]*EIR.merge.5.1$Point.EIR[1]+
   Prop.pop.southwest.2002[5]*EIR.merge.6.1$Point.EIR[1]+Prop.pop.southwest.2002[6]*EIR.merge.7.1$Point.EIR[1]+
   Prop.pop.southwest.2002[7]*EIR.merge.8.1$Point.EIR[1]
-#-32.49 (-34.60, -21.03)
 EIR.southwest.2002.low<-sort(EIR.merge.southwest.2002)[n.cir*0.025]
 EIR.southwest.2002.high<-sort(EIR.merge.southwest.2002)[n.cir*0.975]
 EC.merge.southwest.2002<-EIR.merge.2$EC+EIR.merge.3$EC+
@@ -2249,7 +2067,6 @@ EC.point.southwest.2002<-EIR.merge.2$Point.EC[1]+EIR.merge.3$Point.EC[1]+
   EIR.merge.4$Point.EC[1]+EIR.merge.5.1$Point.EC[1]+
   EIR.merge.6.1$Point.EC[1]+EIR.merge.7.1$Point.EC[1]+
   EIR.merge.8.1$Point.EC[1]
-#-82060 (-86600, -58285)
 EC.southwest.2002.low<-sort(EC.merge.southwest.2002)[n.cir*0.025]
 EC.southwest.2002.high<-sort(EC.merge.southwest.2002)[n.cir*0.975]
 
@@ -2294,7 +2111,6 @@ EIR.point.northwest.2002<-Prop.pop.northwest.2002[1]*EIR.merge.2$Point.EIR[1]+Pr
   Prop.pop.northwest.2002[3]*EIR.merge.4$Point.EIR[1]+Prop.pop.northwest.2002[4]*EIR.merge.5.1$Point.EIR[1]+
   Prop.pop.northwest.2002[5]*EIR.merge.6.1$Point.EIR[1]+Prop.pop.northwest.2002[6]*EIR.merge.7.1$Point.EIR[1]+
   Prop.pop.northwest.2002[7]*EIR.merge.8.1$Point.EIR[1]
-#-118.42 (-122.47, -71.51)
 EIR.northwest.2002.low<-sort(EIR.merge.northwest.2002)[n.cir*0.025]
 EIR.northwest.2002.high<-sort(EIR.merge.northwest.2002)[n.cir*0.975]
 EC.merge.northwest.2002<-EIR.merge.2$EC+EIR.merge.3$EC+
@@ -2305,7 +2121,6 @@ EC.point.northwest.2002<-EIR.merge.2$Point.EC[1]+EIR.merge.3$Point.EC[1]+
   EIR.merge.4$Point.EC[1]+EIR.merge.5.1$Point.EC[1]+
   EIR.merge.6.1$Point.EC[1]+EIR.merge.7.1$Point.EC[1]+
   EIR.merge.8.1$Point.EC[1]
-#-122252 (-127590, -13621)
 EC.northwest.2002.low<-sort(EC.merge.northwest.2002)[n.cir*0.025]
 EC.northwest.2002.high<-sort(EC.merge.northwest.2002)[n.cir*0.975]
 
@@ -2407,7 +2222,6 @@ EIR.point.lowpr.2002<-Prop.pop.lowpr.2002[1]*EIR.merge.2$Point.EIR[1]+Prop.pop.l
   Prop.pop.lowpr.2002[3]*EIR.merge.4$Point.EIR[1]+Prop.pop.lowpr.2002[4]*EIR.merge.5.1$Point.EIR[1]+
   Prop.pop.lowpr.2002[5]*EIR.merge.6.1$Point.EIR[1]+Prop.pop.lowpr.2002[6]*EIR.merge.7.1$Point.EIR[1]+
   Prop.pop.lowpr.2002[7]*EIR.merge.8.1$Point.EIR[1]
-#-26.40 (-27.09, -16.45)
 EIR.lowpr.2002.low<-sort(EIR.merge.lowpr.2002)[n.cir*0.025]
 EIR.lowpr.2002.high<-sort(EIR.merge.lowpr.2002)[n.cir*0.975]
 EC.merge.lowpr.2002<-EIR.merge.2$EC+EIR.merge.3$EC+
@@ -2418,7 +2232,6 @@ EC.point.lowpr.2002<-EIR.merge.2$Point.EC[1]+EIR.merge.3$Point.EC[1]+
   EIR.merge.4$Point.EC[1]+EIR.merge.5.1$Point.EC[1]+
   EIR.merge.6.1$Point.EC[1]+EIR.merge.7.1$Point.EC[1]+
   EIR.merge.8.1$Point.EC[1]
-#-179228 (-183606, -31999)
 EC.lowpr.2002.low<-sort(EC.merge.lowpr.2002)[n.cir*0.025]
 EC.lowpr.2002.high<-sort(EC.merge.lowpr.2002)[n.cir*0.975]
 
@@ -2519,7 +2332,6 @@ EIR.point.middlepr.2002<-Prop.pop.middlepr.2002[1]*EIR.merge.2$Point.EIR[1]+Prop
   Prop.pop.middlepr.2002[3]*EIR.merge.4$Point.EIR[1]+Prop.pop.middlepr.2002[4]*EIR.merge.5.1$Point.EIR[1]+
   Prop.pop.middlepr.2002[5]*EIR.merge.6.1$Point.EIR[1]+Prop.pop.middlepr.2002[6]*EIR.merge.7.1$Point.EIR[1]+
   Prop.pop.middlepr.2002[7]*EIR.merge.8.1$Point.EIR[1]
-#-27.28 (-28.25, -20.33)
 EIR.middlepr.2002.low<-sort(EIR.merge.middlepr.2002)[n.cir*0.025]
 EIR.middlepr.2002.high<-sort(EIR.merge.middlepr.2002)[n.cir*0.975]
 EC.merge.middlepr.2002<-EIR.merge.2$EC+EIR.merge.3$EC+
@@ -2530,7 +2342,6 @@ EC.point.middlepr.2002<-EIR.merge.2$Point.EC[1]+EIR.merge.3$Point.EC[1]+
   EIR.merge.4$Point.EC[1]+EIR.merge.5.1$Point.EC[1]+
   EIR.merge.6.1$Point.EC[1]+EIR.merge.7.1$Point.EC[1]+
   EIR.merge.8.1$Point.EC[1]
-#-121712 (-125909, -59203)
 EC.middlepr.2002.low<-sort(EC.merge.middlepr.2002)[n.cir*0.025]
 EC.middlepr.2002.high<-sort(EC.merge.middlepr.2002)[n.cir*0.975]
 
@@ -2594,7 +2405,6 @@ EIR.point.highpr.2002<-Prop.pop.highpr.2002[1]*EIR.merge.2$Point.EIR[1]+Prop.pop
   Prop.pop.highpr.2002[3]*EIR.merge.4$Point.EIR[1]+Prop.pop.highpr.2002[4]*EIR.merge.5.1$Point.EIR[1]+
   Prop.pop.highpr.2002[5]*EIR.merge.6.1$Point.EIR[1]+Prop.pop.highpr.2002[6]*EIR.merge.7.1$Point.EIR[1]+
   Prop.pop.highpr.2002[7]*EIR.merge.8.1$Point.EIR[1]
-#-16.29 (-17.94, 2.73)
 EIR.highpr.2002.low<-sort(EIR.merge.highpr.2002)[n.cir*0.025]
 EIR.highpr.2002.high<-sort(EIR.merge.highpr.2002)[n.cir*0.975]
 EC.merge.highpr.2002<-EIR.merge.2$EC+EIR.merge.3$EC+
@@ -2605,7 +2415,6 @@ EC.point.highpr.2002<-EIR.merge.2$Point.EC[1]+EIR.merge.3$Point.EC[1]+
   EIR.merge.4$Point.EC[1]+EIR.merge.5.1$Point.EC[1]+
   EIR.merge.6.1$Point.EC[1]+EIR.merge.7.1$Point.EC[1]+
   EIR.merge.8.1$Point.EC[1]
-#-36337 (-40364, 73471)
 EC.highpr.2002.low<-sort(EC.merge.highpr.2002)[n.cir*0.025]
 EC.highpr.2002.high<-sort(EC.merge.highpr.2002)[n.cir*0.975]
 
@@ -2697,7 +2506,6 @@ EIR.point.lowur.2002<-Prop.pop.lowur.2002[1]*EIR.merge.2$Point.EIR[1]+Prop.pop.l
   Prop.pop.lowur.2002[3]*EIR.merge.4$Point.EIR[1]+Prop.pop.lowur.2002[4]*EIR.merge.5.1$Point.EIR[1]+
   Prop.pop.lowur.2002[5]*EIR.merge.6.1$Point.EIR[1]+Prop.pop.lowur.2002[6]*EIR.merge.7.1$Point.EIR[1]+
   Prop.pop.lowur.2002[7]*EIR.merge.8.1$Point.EIR[1]
-#-34.35 (-35.06, -17.87)
 EIR.lowur.2002.low<-sort(EIR.merge.lowur.2002)[n.cir*0.025]
 EIR.lowur.2002.high<-sort(EIR.merge.lowur.2002)[n.cir*0.975]
 EC.merge.lowur.2002<-EIR.merge.2$EC+EIR.merge.3$EC+
@@ -2708,7 +2516,6 @@ EC.point.lowur.2002<-EIR.merge.2$Point.EC[1]+EIR.merge.3$Point.EC[1]+
   EIR.merge.4$Point.EC[1]+EIR.merge.5.1$Point.EC[1]+
   EIR.merge.6.1$Point.EC[1]+EIR.merge.7.1$Point.EC[1]+
   EIR.merge.8.1$Point.EC[1]
-#-258793 (-263708, 8681)
 EC.lowur.2002.low<-sort(EC.merge.lowur.2002)[n.cir*0.025]
 EC.lowur.2002.high<-sort(EC.merge.lowur.2002)[n.cir*0.975]
 
@@ -2811,7 +2618,6 @@ EIR.point.highur.2002<-Prop.pop.highur.2002[1]*EIR.merge.2$Point.EIR[1]+Prop.pop
   Prop.pop.highur.2002[3]*EIR.merge.4$Point.EIR[1]+Prop.pop.highur.2002[4]*EIR.merge.5.1$Point.EIR[1]+
   Prop.pop.highur.2002[5]*EIR.merge.6.1$Point.EIR[1]+Prop.pop.highur.2002[6]*EIR.merge.7.1$Point.EIR[1]+
   Prop.pop.highur.2002[7]*EIR.merge.8.1$Point.EIR[1]
-#-12.96 (-13.54, 3.13)
 EIR.highur.2002.low<-sort(EIR.merge.highur.2002)[n.cir*0.025]
 EIR.highur.2002.high<-sort(EIR.merge.highur.2002)[n.cir*0.975]
 EC.merge.highur.2002<-EIR.merge.2$EC+EIR.merge.3$EC+
@@ -2822,7 +2628,6 @@ EC.point.highur.2002<-EIR.merge.2$Point.EC[1]+EIR.merge.3$Point.EC[1]+
   EIR.merge.4$Point.EC[1]+EIR.merge.5.1$Point.EC[1]+
   EIR.merge.6.1$Point.EC[1]+EIR.merge.7.1$Point.EC[1]+
   EIR.merge.8.1$Point.EC[1]
-#-78475 (-81445, 163264)
 EC.highur.2002.low<-sort(EC.merge.highur.2002)[n.cir*0.025]
 EC.highur.2002.high<-sort(EC.merge.highur.2002)[n.cir*0.975]
 
@@ -2922,7 +2727,6 @@ EIR.point.lowhb.2002<-Prop.pop.lowhb.2002[1]*EIR.merge.2$Point.EIR[1]+Prop.pop.l
   Prop.pop.lowhb.2002[3]*EIR.merge.4$Point.EIR[1]+Prop.pop.lowhb.2002[4]*EIR.merge.5.1$Point.EIR[1]+
   Prop.pop.lowhb.2002[5]*EIR.merge.6.1$Point.EIR[1]+Prop.pop.lowhb.2002[6]*EIR.merge.7.1$Point.EIR[1]+
   Prop.pop.lowhb.2002[7]*EIR.merge.8.1$Point.EIR[1]
-#-24.85 (-25.54, -16.10)
 EIR.lowhb.2002.low<-sort(EIR.merge.lowhb.2002)[n.cir*0.025]
 EIR.lowhb.2002.high<-sort(EIR.merge.lowhb.2002)[n.cir*0.975]
 EC.merge.lowhb.2002<-EIR.merge.2$EC+EIR.merge.3$EC+
@@ -2933,7 +2737,6 @@ EC.point.lowhb.2002<-EIR.merge.2$Point.EC[1]+EIR.merge.3$Point.EC[1]+
   EIR.merge.4$Point.EC[1]+EIR.merge.5.1$Point.EC[1]+
   EIR.merge.6.1$Point.EC[1]+EIR.merge.7.1$Point.EC[1]+
   EIR.merge.8.1$Point.EC[1]
-#-206777 (-211775, -48756)
 EC.lowhb.2002.low<-sort(EC.merge.lowhb.2002)[n.cir*0.025]
 EC.lowhb.2002.high<-sort(EC.merge.lowhb.2002)[n.cir*0.975]
 
@@ -3038,7 +2841,6 @@ EIR.point.highhb.2002<-Prop.pop.highhb.2002[1]*EIR.merge.2$Point.EIR[1]+Prop.pop
   Prop.pop.highhb.2002[3]*EIR.merge.4$Point.EIR[1]+Prop.pop.highhb.2002[4]*EIR.merge.5.1$Point.EIR[1]+
   Prop.pop.highhb.2002[5]*EIR.merge.6.1$Point.EIR[1]+Prop.pop.highhb.2002[6]*EIR.merge.7.1$Point.EIR[1]+
   Prop.pop.highhb.2002[7]*EIR.merge.8.1$Point.EIR[1]
-#-24.33 (-25.07, -12.23)
 EIR.highhb.2002.low<-sort(EIR.merge.highhb.2002)[n.cir*0.025]
 EIR.highhb.2002.high<-sort(EIR.merge.highhb.2002)[n.cir*0.975]
 EC.merge.highhb.2002<-EIR.merge.2$EC+EIR.merge.3$EC+
@@ -3049,7 +2851,6 @@ EC.point.highhb.2002<-EIR.merge.2$Point.EC[1]+EIR.merge.3$Point.EC[1]+
   EIR.merge.4$Point.EC[1]+EIR.merge.5.1$Point.EC[1]+
   EIR.merge.6.1$Point.EC[1]+EIR.merge.7.1$Point.EC[1]+
   EIR.merge.8.1$Point.EC[1]
-#-130500 (-134160, 16348)
 EC.highhb.2002.low<-sort(EC.merge.highhb.2002)[n.cir*0.025]
 EC.highhb.2002.high<-sort(EC.merge.highhb.2002)[n.cir*0.975]
 
@@ -3143,7 +2944,6 @@ EIR.point.lowir.2002<-Prop.pop.lowir.2002[1]*EIR.merge.2$Point.EIR[1]+Prop.pop.l
   Prop.pop.lowir.2002[3]*EIR.merge.4$Point.EIR[1]+Prop.pop.lowir.2002[4]*EIR.merge.5.1$Point.EIR[1]+
   Prop.pop.lowir.2002[5]*EIR.merge.6.1$Point.EIR[1]+Prop.pop.lowir.2002[6]*EIR.merge.7.1$Point.EIR[1]+
   Prop.pop.lowir.2002[7]*EIR.merge.8.1$Point.EIR[1]
-#-27.13 (-27.90, -12.08)
 EIR.lowir.2002.low<-sort(EIR.merge.lowir.2002)[n.cir*0.025]
 EIR.lowir.2002.high<-sort(EIR.merge.lowir.2002)[n.cir*0.975]
 EC.merge.lowir.2002<-EIR.merge.2$EC+EIR.merge.3$EC+
@@ -3154,7 +2954,6 @@ EC.point.lowir.2002<-EIR.merge.2$Point.EC[1]+EIR.merge.3$Point.EC[1]+
   EIR.merge.4$Point.EC[1]+EIR.merge.5.1$Point.EC[1]+
   EIR.merge.6.1$Point.EC[1]+EIR.merge.7.1$Point.EC[1]+
   EIR.merge.8.1$Point.EC[1]
-#-187125 (-191904, -35268)
 EC.lowir.2002.low<-sort(EC.merge.lowir.2002)[n.cir*0.025]
 EC.lowir.2002.high<-sort(EC.merge.lowir.2002)[n.cir*0.975]
 
@@ -3251,7 +3050,6 @@ EIR.point.highir.2002<-Prop.pop.highir.2002[1]*EIR.merge.2$Point.EIR[1]+Prop.pop
   Prop.pop.highir.2002[3]*EIR.merge.4$Point.EIR[1]+Prop.pop.highir.2002[4]*EIR.merge.5.1$Point.EIR[1]+
   Prop.pop.highir.2002[5]*EIR.merge.6.1$Point.EIR[1]+Prop.pop.highir.2002[6]*EIR.merge.7.1$Point.EIR[1]+
   Prop.pop.highir.2002[7]*EIR.merge.8.1$Point.EIR[1]
-#-22.39 (-23.02, -16.46)
 EIR.highir.2002.low<-sort(EIR.merge.highir.2002)[n.cir*0.025]
 EIR.highir.2002.high<-sort(EIR.merge.highir.2002)[n.cir*0.975]
 EC.merge.highir.2002<-EIR.merge.2$EC+EIR.merge.3$EC+
@@ -3262,7 +3060,6 @@ EC.point.highir.2002<-EIR.merge.2$Point.EC[1]+EIR.merge.3$Point.EC[1]+
   EIR.merge.4$Point.EC[1]+EIR.merge.5.1$Point.EC[1]+
   EIR.merge.6.1$Point.EC[1]+EIR.merge.7.1$Point.EC[1]+
   EIR.merge.8.1$Point.EC[1]
-#-150152 (-154401, -65001)
 EC.highir.2002.low<-sort(EC.merge.highir.2002)[n.cir*0.025]
 EC.highir.2002.high<-sort(EC.merge.highir.2002)[n.cir*0.975]
 
@@ -3275,10 +3072,6 @@ Southcentral<-c(16,17,18,19,20,21)
 Southwest<-c(22,23,24,25,26)
 Northwest<-c(27,28,29,30,31)
 #North
-Age.pop5<-mean(aggregate(Population.book~Time,
-                         data=Hepatitis.B.agegroup9[which(Hepatitis.B.agegroup9$Order==3|
-                                                            Hepatitis.B.agegroup9$Order==4),],FUN=sum)[,2])
-
 Age.pop6<-mean(aggregate(Population.book~Time,
                          data=Hepatitis.B.agegroup10[which(Hepatitis.B.agegroup10$Order==3|
                                                              Hepatitis.B.agegroup10$Order==4|
@@ -3295,39 +3088,32 @@ Age.pop9<-mean(aggregate(Population.book~Time,
 Age.pop10<-mean(aggregate(Population.book~Time,
                           data=Hepatitis.B.agegroup14[which(Hepatitis.B.agegroup14$Order>0&
                                                               Hepatitis.B.agegroup14$Order<6),],FUN=sum)[,2])
-Age.pop.2009<-c(Age.pop5,Age.pop6,Age.pop7,Age.pop8,Age.pop9,Age.pop10)
-Prop.pop.north.2009<-c(Age.pop5/sum(Age.pop.2009),Age.pop6/sum(Age.pop.2009),Age.pop7/sum(Age.pop.2009),
+Age.pop.2009<-c(Age.pop6,Age.pop7,Age.pop8,Age.pop9,Age.pop10)
+Prop.pop.north.2009<-c(Age.pop6/sum(Age.pop.2009),Age.pop7/sum(Age.pop.2009),
                        Age.pop8/sum(Age.pop.2009),Age.pop9/sum(Age.pop.2009),Age.pop10/sum(Age.pop.2009))
-EIR.merge.5.2<-EIR.merge.2009(c(3,4),Hepatitis.B.agegroup9,"model5",c(3,11),2/12,10000)
 EIR.merge.6.2<-EIR.merge.2009(c(3,4,5),Hepatitis.B.agegroup10,"model6",c(3,11),(2+12)/12,10000)
 EIR.merge.7.2<-EIR.merge.2009(c(1,2,3,4,5),Hepatitis.B.agegroup11,"model7",c(3,11),(2+2*12)/12,10000)
 EIR.merge.8.2<-EIR.merge.2009(c(1,2,3,4,5),Hepatitis.B.agegroup12,"model8",c(3,11),(2+7*12)/12,10000)
 EIR.merge.9<-EIR.merge.2009(c(1,2,3,4,5),Hepatitis.B.agegroup13,"model9",c(2,9),6,10000)
 EIR.merge.10<-EIR.merge.2009(c(1,2,3,4,5),Hepatitis.B.agegroup14,"model10",c(2,9),1,10000)
-EIR.merge.north.2009<-Prop.pop.north.2009[1]*EIR.merge.5.2$EIR+Prop.pop.north.2009[2]*EIR.merge.6.2$EIR+
-  Prop.pop.north.2009[3]*EIR.merge.7.2$EIR+Prop.pop.north.2009[4]*EIR.merge.8.2$EIR+
-  Prop.pop.north.2009[5]*EIR.merge.9$EIR+Prop.pop.north.2009[6]*EIR.merge.10$EIR
-EIR.point.north.2009<-Prop.pop.north.2009[1]*EIR.merge.5.2$Point.EIR[1]+Prop.pop.north.2009[2]*EIR.merge.6.2$Point.EIR[1]+
-  Prop.pop.north.2009[3]*EIR.merge.7.2$Point.EIR[1]+Prop.pop.north.2009[4]*EIR.merge.8.2$Point.EIR[1]+
-  Prop.pop.north.2009[5]*EIR.merge.9$Point.EIR[1]+Prop.pop.north.2009[6]*EIR.merge.10$Point.EIR[1]
-#-28.01 (-30.93, -24.50)
+EIR.merge.north.2009<-Prop.pop.north.2009[1]*EIR.merge.6.2$EIR+
+  Prop.pop.north.2009[2]*EIR.merge.7.2$EIR+Prop.pop.north.2009[3]*EIR.merge.8.2$EIR+
+  Prop.pop.north.2009[4]*EIR.merge.9$EIR+Prop.pop.north.2009[5]*EIR.merge.10$EIR
+EIR.point.north.2009<-Prop.pop.north.2009[1]*EIR.merge.6.2$Point.EIR[1]+
+  Prop.pop.north.2009[2]*EIR.merge.7.2$Point.EIR[1]+Prop.pop.north.2009[3]*EIR.merge.8.2$Point.EIR[1]+
+  Prop.pop.north.2009[4]*EIR.merge.9$Point.EIR[1]+Prop.pop.north.2009[5]*EIR.merge.10$Point.EIR[1]
 EIR.north.2009.low<-sort(EIR.merge.north.2009)[n.cir*0.025]
 EIR.north.2009.high<-sort(EIR.merge.north.2009)[n.cir*0.975]
-EC.merge.north.2009<-EIR.merge.5.2$EC+EIR.merge.6.2$EC+
+EC.merge.north.2009<-EIR.merge.6.2$EC+
   EIR.merge.7.2$EC+EIR.merge.8.2$EC+
   EIR.merge.9$EC+EIR.merge.10$EC
-EC.point.north.2009<-EIR.merge.5.2$Point.EC[1]+EIR.merge.6.2$Point.EC[1]+
+EC.point.north.2009<-EIR.merge.6.2$Point.EC[1]+
   EIR.merge.7.2$Point.EC[1]+EIR.merge.8.2$Point.EC[1]+
   EIR.merge.9$Point.EC[1]+EIR.merge.10$Point.EC[1]
-#-66939 (-72132, -60937)
 EC.north.2009.low<-sort(EC.merge.north.2009)[n.cir*0.025]
 EC.north.2009.high<-sort(EC.merge.north.2009)[n.cir*0.975]
 
 #Northeast
-Age.pop5<-mean(aggregate(Population.book~Time,
-                         data=Hepatitis.B.agegroup9[which(Hepatitis.B.agegroup9$Order>5&
-                                                            Hepatitis.B.agegroup9$Order<9),],FUN=sum)[,2])
-
 Age.pop6<-mean(aggregate(Population.book~Time,
                          data=Hepatitis.B.agegroup10[which(Hepatitis.B.agegroup10$Order>5&
                                                              Hepatitis.B.agegroup10$Order<9),],FUN=sum)[,2])
@@ -3343,39 +3129,32 @@ Age.pop9<-mean(aggregate(Population.book~Time,
 Age.pop10<-mean(aggregate(Population.book~Time,
                           data=Hepatitis.B.agegroup14[which(Hepatitis.B.agegroup14$Order>5&
                                                               Hepatitis.B.agegroup14$Order<9),],FUN=sum)[,2])
-Age.pop.2009<-c(Age.pop5,Age.pop6,Age.pop7,Age.pop8,Age.pop9,Age.pop10)
-Prop.pop.northeast.2009<-c(Age.pop5/sum(Age.pop.2009),Age.pop6/sum(Age.pop.2009),Age.pop7/sum(Age.pop.2009),
+Age.pop.2009<-c(Age.pop6,Age.pop7,Age.pop8,Age.pop9,Age.pop10)
+Prop.pop.northeast.2009<-c(Age.pop6/sum(Age.pop.2009),Age.pop7/sum(Age.pop.2009),
                            Age.pop8/sum(Age.pop.2009),Age.pop9/sum(Age.pop.2009),Age.pop10/sum(Age.pop.2009))
-EIR.merge.5.2<-EIR.merge.2009(c(6:8),Hepatitis.B.agegroup9,"model5",c(3,11),2/12,10000)
 EIR.merge.6.2<-EIR.merge.2009(c(6:8),Hepatitis.B.agegroup10,"model6",c(3,11),(2+12)/12,10000)
 EIR.merge.7.2<-EIR.merge.2009(c(6:8),Hepatitis.B.agegroup11,"model7",c(3,11),(2+2*12)/12,10000)
 EIR.merge.8.2<-EIR.merge.2009(c(6:8),Hepatitis.B.agegroup12,"model8",c(3,11),(2+7*12)/12,10000)
 EIR.merge.9<-EIR.merge.2009(c(6:8),Hepatitis.B.agegroup13,"model9",c(2,9),6,10000)
 EIR.merge.10<-EIR.merge.2009(c(6:8),Hepatitis.B.agegroup14,"model10",c(2,9),1,10000)
-EIR.merge.northeast.2009<-Prop.pop.northeast.2009[1]*EIR.merge.5.2$EIR+Prop.pop.northeast.2009[2]*EIR.merge.6.2$EIR+
-  Prop.pop.northeast.2009[3]*EIR.merge.7.2$EIR+Prop.pop.northeast.2009[4]*EIR.merge.8.2$EIR+
-  Prop.pop.northeast.2009[5]*EIR.merge.9$EIR+Prop.pop.northeast.2009[6]*EIR.merge.10$EIR
-EIR.point.northeast.2009<-Prop.pop.northeast.2009[1]*EIR.merge.5.2$Point.EIR[1]+Prop.pop.northeast.2009[2]*EIR.merge.6.2$Point.EIR[1]+
-  Prop.pop.northeast.2009[3]*EIR.merge.7.2$Point.EIR[1]+Prop.pop.northeast.2009[4]*EIR.merge.8.2$Point.EIR[1]+
-  Prop.pop.northeast.2009[5]*EIR.merge.9$Point.EIR[1]+Prop.pop.northeast.2009[6]*EIR.merge.10$Point.EIR[1]
-#-14.81 (-17.92, -10.79)
+EIR.merge.northeast.2009<-Prop.pop.northeast.2009[1]*EIR.merge.6.2$EIR+
+  Prop.pop.northeast.2009[2]*EIR.merge.7.2$EIR+Prop.pop.northeast.2009[3]*EIR.merge.8.2$EIR+
+  Prop.pop.northeast.2009[4]*EIR.merge.9$EIR+Prop.pop.northeast.2009[5]*EIR.merge.10$EIR
+EIR.point.northeast.2009<-Prop.pop.northeast.2009[1]*EIR.merge.6.2$Point.EIR[1]+
+  Prop.pop.northeast.2009[2]*EIR.merge.7.2$Point.EIR[1]+Prop.pop.northeast.2009[3]*EIR.merge.8.2$Point.EIR[1]+
+  Prop.pop.northeast.2009[4]*EIR.merge.9$Point.EIR[1]+Prop.pop.northeast.2009[5]*EIR.merge.10$Point.EIR[1]
 EIR.northeast.2009.low<-sort(EIR.merge.northeast.2009)[n.cir*0.025]
 EIR.northeast.2009.high<-sort(EIR.merge.northeast.2009)[n.cir*0.975]
-EC.merge.northeast.2009<-EIR.merge.5.2$EC+EIR.merge.6.2$EC+
+EC.merge.northeast.2009<-EIR.merge.6.2$EC+
   EIR.merge.7.2$EC+EIR.merge.8.2$EC+
   EIR.merge.9$EC+EIR.merge.10$EC
-EC.point.northeast.2009<-EIR.merge.5.2$Point.EC[1]+EIR.merge.6.2$Point.EC[1]+
+EC.point.northeast.2009<-EIR.merge.6.2$Point.EC[1]+
   EIR.merge.7.2$Point.EC[1]+EIR.merge.8.2$Point.EC[1]+
   EIR.merge.9$Point.EC[1]+EIR.merge.10$Point.EC[1]
-#-21466 (-24893, -17550)
 EC.northeast.2009.low<-sort(EC.merge.northeast.2009)[n.cir*0.025]
 EC.northeast.2009.high<-sort(EC.merge.northeast.2009)[n.cir*0.975]
 
 #East
-Age.pop5<-mean(aggregate(Population.book~Time,
-                         data=Hepatitis.B.agegroup9[which(Hepatitis.B.agegroup9$Order==10|
-                                                            Hepatitis.B.agegroup9$Order==13),],FUN=sum)[,2])
-
 Age.pop6<-mean(aggregate(Population.book~Time,
                          data=Hepatitis.B.agegroup10[which(Hepatitis.B.agegroup10$Order>9&
                                                              Hepatitis.B.agegroup10$Order<16),],FUN=sum)[,2])
@@ -3391,39 +3170,32 @@ Age.pop9<-mean(aggregate(Population.book~Time,
 Age.pop10<-mean(aggregate(Population.book~Time,
                           data=Hepatitis.B.agegroup14[which(Hepatitis.B.agegroup14$Order>8&
                                                               Hepatitis.B.agegroup14$Order<16),],FUN=sum)[,2])
-Age.pop.2009<-c(Age.pop5,Age.pop6,Age.pop7,Age.pop8,Age.pop9,Age.pop10)
-Prop.pop.east.2009<-c(Age.pop5/sum(Age.pop.2009),Age.pop6/sum(Age.pop.2009),Age.pop7/sum(Age.pop.2009),
+Age.pop.2009<-c(Age.pop6,Age.pop7,Age.pop8,Age.pop9,Age.pop10)
+Prop.pop.east.2009<-c(Age.pop6/sum(Age.pop.2009),Age.pop7/sum(Age.pop.2009),
                       Age.pop8/sum(Age.pop.2009),Age.pop9/sum(Age.pop.2009),Age.pop10/sum(Age.pop.2009))
-EIR.merge.5.2<-EIR.merge.2009(c(10,13),Hepatitis.B.agegroup9,"model5",c(3,11),2/12,10000)
 EIR.merge.6.2<-EIR.merge.2009(c(10:15),Hepatitis.B.agegroup10,"model6",c(3,11),(2+12)/12,10000)
 EIR.merge.7.2<-EIR.merge.2009(c(9:15),Hepatitis.B.agegroup11,"model7",c(3,11),(2+2*12)/12,10000)
 EIR.merge.8.2<-EIR.merge.2009(c(9:15),Hepatitis.B.agegroup12,"model8",c(3,11),(2+7*12)/12,10000)
 EIR.merge.9<-EIR.merge.2009(c(9:15),Hepatitis.B.agegroup13,"model9",c(2,9),6,10000)
 EIR.merge.10<-EIR.merge.2009(c(9:15),Hepatitis.B.agegroup14,"model10",c(2,9),1,10000)
-EIR.merge.east.2009<-Prop.pop.east.2009[1]*EIR.merge.5.2$EIR+Prop.pop.east.2009[2]*EIR.merge.6.2$EIR+
-  Prop.pop.east.2009[3]*EIR.merge.7.2$EIR+Prop.pop.east.2009[4]*EIR.merge.8.2$EIR+
-  Prop.pop.east.2009[5]*EIR.merge.9$EIR+Prop.pop.east.2009[6]*EIR.merge.10$EIR
-EIR.point.east.2009<-Prop.pop.east.2009[1]*EIR.merge.5.2$Point.EIR[1]+Prop.pop.east.2009[2]*EIR.merge.6.2$Point.EIR[1]+
-  Prop.pop.east.2009[3]*EIR.merge.7.2$Point.EIR[1]+Prop.pop.east.2009[4]*EIR.merge.8.2$Point.EIR[1]+
-  Prop.pop.east.2009[5]*EIR.merge.9$Point.EIR[1]+Prop.pop.east.2009[6]*EIR.merge.10$Point.EIR[1]
-#-6.56 (-8.23, -4.52)
+EIR.merge.east.2009<-Prop.pop.east.2009[1]*EIR.merge.6.2$EIR+
+  Prop.pop.east.2009[2]*EIR.merge.7.2$EIR+Prop.pop.east.2009[3]*EIR.merge.8.2$EIR+
+  Prop.pop.east.2009[4]*EIR.merge.9$EIR+Prop.pop.east.2009[5]*EIR.merge.10$EIR
+EIR.point.east.2009<-Prop.pop.east.2009[1]*EIR.merge.6.2$Point.EIR[1]+
+  Prop.pop.east.2009[2]*EIR.merge.7.2$Point.EIR[1]+Prop.pop.east.2009[3]*EIR.merge.8.2$Point.EIR[1]+
+  Prop.pop.east.2009[4]*EIR.merge.9$Point.EIR[1]+Prop.pop.east.2009[5]*EIR.merge.10$Point.EIR[1]
 EIR.east.2009.low<-sort(EIR.merge.east.2009)[n.cir*0.025]
 EIR.east.2009.high<-sort(EIR.merge.east.2009)[n.cir*0.975]
-EC.merge.east.2009<-EIR.merge.5.2$EC+EIR.merge.6.2$EC+
+EC.merge.east.2009<-EIR.merge.6.2$EC+
   EIR.merge.7.2$EC+EIR.merge.8.2$EC+
   EIR.merge.9$EC+EIR.merge.10$EC
-EC.point.east.2009<-EIR.merge.5.2$Point.EC[1]+EIR.merge.6.2$Point.EC[1]+
+EC.point.east.2009<-EIR.merge.6.2$Point.EC[1]+
   EIR.merge.7.2$Point.EC[1]+EIR.merge.8.2$Point.EC[1]+
   EIR.merge.9$Point.EC[1]+EIR.merge.10$Point.EC[1]
-#-37243 (-43337, -30174)
 EC.east.2009.low<-sort(EC.merge.east.2009)[n.cir*0.025]
 EC.east.2009.high<-sort(EC.merge.east.2009)[n.cir*0.975]
 
 #South-centre
-Age.pop5<-mean(aggregate(Population.book~Time,
-                         data=Hepatitis.B.agegroup9[which(Hepatitis.B.agegroup9$Order>15&
-                                                            Hepatitis.B.agegroup9$Order<21),],FUN=sum)[,2])
-
 Age.pop6<-mean(aggregate(Population.book~Time,
                          data=Hepatitis.B.agegroup10[which(Hepatitis.B.agegroup10$Order>15&
                                                              Hepatitis.B.agegroup10$Order<22),],FUN=sum)[,2])
@@ -3439,38 +3211,32 @@ Age.pop9<-mean(aggregate(Population.book~Time,
 Age.pop10<-mean(aggregate(Population.book~Time,
                           data=Hepatitis.B.agegroup14[which(Hepatitis.B.agegroup14$Order>15&
                                                               Hepatitis.B.agegroup14$Order<22),],FUN=sum)[,2])
-Age.pop.2009<-c(Age.pop5,Age.pop6,Age.pop7,Age.pop8,Age.pop9,Age.pop10)
-Prop.pop.southcentral.2009<-c(Age.pop5/sum(Age.pop.2009),Age.pop6/sum(Age.pop.2009),Age.pop7/sum(Age.pop.2009),
+Age.pop.2009<-c(Age.pop6,Age.pop7,Age.pop8,Age.pop9,Age.pop10)
+Prop.pop.southcentral.2009<-c(Age.pop6/sum(Age.pop.2009),Age.pop7/sum(Age.pop.2009),
                               Age.pop8/sum(Age.pop.2009),Age.pop9/sum(Age.pop.2009),Age.pop10/sum(Age.pop.2009))
-EIR.merge.5.2<-EIR.merge.2009(c(16:20),Hepatitis.B.agegroup9,"model5",c(3,11),2/12,10000)
 EIR.merge.6.2<-EIR.merge.2009(c(16:21),Hepatitis.B.agegroup10,"model6",c(3,11),(2+12)/12,10000)
 EIR.merge.7.2<-EIR.merge.2009(c(16:21),Hepatitis.B.agegroup11,"model7",c(3,11),(2+2*12)/12,10000)
 EIR.merge.8.2<-EIR.merge.2009(c(16:21),Hepatitis.B.agegroup12,"model8",c(3,11),(2+7*12)/12,10000)
 EIR.merge.9<-EIR.merge.2009(c(16:21),Hepatitis.B.agegroup13,"model9",c(2,9),6,10000)
 EIR.merge.10<-EIR.merge.2009(c(16:21),Hepatitis.B.agegroup14,"model10",c(2,9),1,10000)
-EIR.merge.southcentral.2009<-Prop.pop.southcentral.2009[1]*EIR.merge.5.2$EIR+Prop.pop.southcentral.2009[2]*EIR.merge.6.2$EIR+
-  Prop.pop.southcentral.2009[3]*EIR.merge.7.2$EIR+Prop.pop.southcentral.2009[4]*EIR.merge.8.2$EIR+
-  Prop.pop.southcentral.2009[5]*EIR.merge.9$EIR+Prop.pop.southcentral.2009[6]*EIR.merge.10$EIR
-EIR.point.southcentral.2009<-Prop.pop.southcentral.2009[1]*EIR.merge.5.2$Point.EIR[1]+Prop.pop.southcentral.2009[2]*EIR.merge.6.2$Point.EIR[1]+
-  Prop.pop.southcentral.2009[3]*EIR.merge.7.2$Point.EIR[1]+Prop.pop.southcentral.2009[4]*EIR.merge.8.2$Point.EIR[1]+
-  Prop.pop.southcentral.2009[5]*EIR.merge.9$Point.EIR[1]+Prop.pop.southcentral.2009[6]*EIR.merge.10$Point.EIR[1]
-#-37.45 (-41.17, -32.92)
+EIR.merge.southcentral.2009<-Prop.pop.southcentral.2009[1]*EIR.merge.6.2$EIR+
+  Prop.pop.southcentral.2009[2]*EIR.merge.7.2$EIR+Prop.pop.southcentral.2009[3]*EIR.merge.8.2$EIR+
+  Prop.pop.southcentral.2009[4]*EIR.merge.9$EIR+Prop.pop.southcentral.2009[5]*EIR.merge.10$EIR
+EIR.point.southcentral.2009<-Prop.pop.southcentral.2009[1]*EIR.merge.6.2$Point.EIR[1]+
+  Prop.pop.southcentral.2009[2]*EIR.merge.7.2$Point.EIR[1]+Prop.pop.southcentral.2009[3]*EIR.merge.8.2$Point.EIR[1]+
+  Prop.pop.southcentral.2009[4]*EIR.merge.9$Point.EIR[1]+Prop.pop.southcentral.2009[5]*EIR.merge.10$Point.EIR[1]
 EIR.southcentral.2009.low<-sort(EIR.merge.southcentral.2009)[n.cir*0.025]
 EIR.southcentral.2009.high<-sort(EIR.merge.southcentral.2009)[n.cir*0.975]
-EC.merge.southcentral.2009<-EIR.merge.5.2$EC+EIR.merge.6.2$EC+
+EC.merge.southcentral.2009<-EIR.merge.6.2$EC+
   EIR.merge.7.2$EC+EIR.merge.8.2$EC+
   EIR.merge.9$EC+EIR.merge.10$EC
-EC.point.southcentral.2009<-EIR.merge.5.2$Point.EC[1]+EIR.merge.6.2$Point.EC[1]+
+EC.point.southcentral.2009<-EIR.merge.6.2$Point.EC[1]+
   EIR.merge.7.2$Point.EC[1]+EIR.merge.8.2$Point.EC[1]+
   EIR.merge.9$Point.EC[1]+EIR.merge.10$Point.EC[1]
-#-198764 (-212349, -183386)
 EC.southcentral.2009.low<-sort(EC.merge.southcentral.2009)[n.cir*0.025]
 EC.southcentral.2009.high<-sort(EC.merge.southcentral.2009)[n.cir*0.975]
 
 #Southwest
-Age.pop5<-mean(aggregate(Population.book~Time,
-                         data=Hepatitis.B.agegroup9[which(Hepatitis.B.agegroup9$Order>21&
-                                                            Hepatitis.B.agegroup9$Order<25),],FUN=sum)[,2])
 Age.pop6<-mean(aggregate(Population.book~Time,
                          data=Hepatitis.B.agegroup10[which(Hepatitis.B.agegroup10$Order>21&
                                                              Hepatitis.B.agegroup10$Order<26),],FUN=sum)[,2])
@@ -3486,37 +3252,32 @@ Age.pop9<-mean(aggregate(Population.book~Time,
 Age.pop10<-mean(aggregate(Population.book~Time,
                           data=Hepatitis.B.agegroup14[which(Hepatitis.B.agegroup14$Order>21&
                                                               Hepatitis.B.agegroup14$Order<27),],FUN=sum)[,2])
-Age.pop.2009<-c(Age.pop5,Age.pop6,Age.pop7,Age.pop8,Age.pop9,Age.pop10)
-Prop.pop.southwest.2009<-c(Age.pop5/sum(Age.pop.2009),Age.pop6/sum(Age.pop.2009),Age.pop7/sum(Age.pop.2009),
+Age.pop.2009<-c(Age.pop6,Age.pop7,Age.pop8,Age.pop9,Age.pop10)
+Prop.pop.southwest.2009<-c(Age.pop6/sum(Age.pop.2009),Age.pop7/sum(Age.pop.2009),
                            Age.pop8/sum(Age.pop.2009),Age.pop9/sum(Age.pop.2009),Age.pop10/sum(Age.pop.2009))
-EIR.merge.5.2<-EIR.merge.2009(c(22:24),Hepatitis.B.agegroup9,"model5",c(3,11),2/12,10000)
 EIR.merge.6.2<-EIR.merge.2009(c(22:25),Hepatitis.B.agegroup10,"model6",c(3,11),(2+12)/12,10000)
 EIR.merge.7.2<-EIR.merge.2009(c(22:26),Hepatitis.B.agegroup11,"model7",c(3,11),(2+2*12)/12,10000)
 EIR.merge.8.2<-EIR.merge.2009(c(22:26),Hepatitis.B.agegroup12,"model8",c(3,11),(2+7*12)/12,10000)
 EIR.merge.9<-EIR.merge.2009(c(22:26),Hepatitis.B.agegroup13,"model9",c(2,9),6,10000)
 EIR.merge.10<-EIR.merge.2009(c(22:26),Hepatitis.B.agegroup14,"model10",c(2,9),1,10000)
-EIR.merge.southwest.2009<-Prop.pop.southwest.2009[1]*EIR.merge.5.2$EIR+Prop.pop.southwest.2009[2]*EIR.merge.6.2$EIR+
-  Prop.pop.southwest.2009[3]*EIR.merge.7.2$EIR+Prop.pop.southwest.2009[4]*EIR.merge.8.2$EIR+
-  Prop.pop.southwest.2009[5]*EIR.merge.9$EIR+Prop.pop.southwest.2009[6]*EIR.merge.10$EIR
-EIR.point.southwest.2009<-Prop.pop.southwest.2009[1]*EIR.merge.5.2$Point.EIR[1]+Prop.pop.southwest.2009[2]*EIR.merge.6.2$Point.EIR[1]+
-  Prop.pop.southwest.2009[3]*EIR.merge.7.2$Point.EIR[1]+Prop.pop.southwest.2009[4]*EIR.merge.8.2$Point.EIR[1]+
-  Prop.pop.southwest.2009[5]*EIR.merge.9$Point.EIR[1]+Prop.pop.southwest.2009[6]*EIR.merge.10$Point.EIR[1]
-#-11.37 (-13.95, -7.93)
+EIR.merge.southwest.2009<-Prop.pop.southwest.2009[1]*EIR.merge.6.2$EIR+
+  Prop.pop.southwest.2009[2]*EIR.merge.7.2$EIR+Prop.pop.southwest.2009[3]*EIR.merge.8.2$EIR+
+  Prop.pop.southwest.2009[4]*EIR.merge.9$EIR+Prop.pop.southwest.2009[5]*EIR.merge.10$EIR
+EIR.point.southwest.2009<-Prop.pop.southwest.2009[1]*EIR.merge.6.2$Point.EIR[1]+
+  Prop.pop.southwest.2009[2]*EIR.merge.7.2$Point.EIR[1]+Prop.pop.southwest.2009[3]*EIR.merge.8.2$Point.EIR[1]+
+  Prop.pop.southwest.2009[4]*EIR.merge.9$Point.EIR[1]+Prop.pop.southwest.2009[5]*EIR.merge.10$Point.EIR[1]
 EIR.southwest.2009.low<-sort(EIR.merge.southwest.2009)[n.cir*0.025]
 EIR.southwest.2009.high<-sort(EIR.merge.southwest.2009)[n.cir*0.975]
-EC.merge.southwest.2009<-EIR.merge.5.2$EC+EIR.merge.6.2$EC+
+EC.merge.southwest.2009<-EIR.merge.6.2$EC+
   EIR.merge.7.2$EC+EIR.merge.8.2$EC+
   EIR.merge.9$EC+EIR.merge.10$EC
-EC.point.southwest.2009<-EIR.merge.5.2$Point.EC[1]+EIR.merge.6.2$Point.EC[1]+
+EC.point.southwest.2009<-EIR.merge.6.2$Point.EC[1]+
   EIR.merge.7.2$Point.EC[1]+EIR.merge.8.2$Point.EC[1]+
   EIR.merge.9$Point.EC[1]+EIR.merge.10$Point.EC[1]
-#-39073 (-44846, -31750)
 EC.southwest.2009.low<-sort(EC.merge.southwest.2009)[n.cir*0.025]
 EC.southwest.2009.high<-sort(EC.merge.southwest.2009)[n.cir*0.975]
 
 #Northwest
-Age.pop5<-mean(aggregate(Population.book~Time,
-                         data=Hepatitis.B.agegroup9[which(Hepatitis.B.agegroup9$Order>26),],FUN=sum)[,2])
 Age.pop6<-mean(aggregate(Population.book~Time,
                          data=Hepatitis.B.agegroup10[which(Hepatitis.B.agegroup10$Order>26),],FUN=sum)[,2])
 Age.pop7<-mean(aggregate(Population.book~Time,
@@ -3527,31 +3288,28 @@ Age.pop9<-mean(aggregate(Population.book~Time,
                          data=Hepatitis.B.agegroup13[which(Hepatitis.B.agegroup13$Order>26),],FUN=sum)[,2])
 Age.pop10<-mean(aggregate(Population.book~Time,
                           data=Hepatitis.B.agegroup14[which(Hepatitis.B.agegroup14$Order>26),],FUN=sum)[,2])
-Age.pop.2009<-c(Age.pop5,Age.pop6,Age.pop7,Age.pop8,Age.pop9,Age.pop10)
-Prop.pop.northwest.2009<-c(Age.pop5/sum(Age.pop.2009),Age.pop6/sum(Age.pop.2009),Age.pop7/sum(Age.pop.2009),
+Age.pop.2009<-c(Age.pop6,Age.pop7,Age.pop8,Age.pop9,Age.pop10)
+Prop.pop.northwest.2009<-c(Age.pop6/sum(Age.pop.2009),Age.pop7/sum(Age.pop.2009),
                            Age.pop8/sum(Age.pop.2009),Age.pop9/sum(Age.pop.2009),Age.pop10/sum(Age.pop.2009))
-EIR.merge.5.2<-EIR.merge.2009(c(27:31),Hepatitis.B.agegroup9,"model5",c(3,11),2/12,10000)
 EIR.merge.6.2<-EIR.merge.2009(c(27:31),Hepatitis.B.agegroup10,"model6",c(3,11),(2+12)/12,10000)
 EIR.merge.7.2<-EIR.merge.2009(c(27:31),Hepatitis.B.agegroup11,"model7",c(3,11),(2+2*12)/12,10000)
 EIR.merge.8.2<-EIR.merge.2009(c(27:31),Hepatitis.B.agegroup12,"model8",c(3,11),(2+7*12)/12,10000)
 EIR.merge.9<-EIR.merge.2009(c(27:31),Hepatitis.B.agegroup13,"model9",c(2,9),6,10000)
 EIR.merge.10<-EIR.merge.2009(c(27:31),Hepatitis.B.agegroup14,"model10",c(2,9),1,10000)
-EIR.merge.northwest.2009<-Prop.pop.northwest.2009[1]*EIR.merge.5.2$EIR+Prop.pop.northwest.2009[2]*EIR.merge.6.2$EIR+
-  Prop.pop.northwest.2009[3]*EIR.merge.7.2$EIR+Prop.pop.northwest.2009[4]*EIR.merge.8.2$EIR+
-  Prop.pop.northwest.2009[5]*EIR.merge.9$EIR+Prop.pop.northwest.2009[6]*EIR.merge.10$EIR
-EIR.point.northwest.2009<-Prop.pop.northwest.2009[1]*EIR.merge.5.2$Point.EIR[1]+Prop.pop.northwest.2009[2]*EIR.merge.6.2$Point.EIR[1]+
-  Prop.pop.northwest.2009[3]*EIR.merge.7.2$Point.EIR[1]+Prop.pop.northwest.2009[4]*EIR.merge.8.2$Point.EIR[1]+
-  Prop.pop.northwest.2009[5]*EIR.merge.9$Point.EIR[1]+Prop.pop.northwest.2009[6]*EIR.merge.10$Point.EIR[1]
-#-79.40 (-84.98, -71.65)
+EIR.merge.northwest.2009<-Prop.pop.northwest.2009[1]*EIR.merge.6.2$EIR+
+  Prop.pop.northwest.2009[2]*EIR.merge.7.2$EIR+Prop.pop.northwest.2009[3]*EIR.merge.8.2$EIR+
+  Prop.pop.northwest.2009[4]*EIR.merge.9$EIR+Prop.pop.northwest.2009[5]*EIR.merge.10$EIR
+EIR.point.northwest.2009<-Prop.pop.northwest.2009[1]*EIR.merge.6.2$Point.EIR[1]+
+  Prop.pop.northwest.2009[2]*EIR.merge.7.2$Point.EIR[1]+Prop.pop.northwest.2009[3]*EIR.merge.8.2$Point.EIR[1]+
+  Prop.pop.northwest.2009[4]*EIR.merge.9$Point.EIR[1]+Prop.pop.northwest.2009[5]*EIR.merge.10$Point.EIR[1]
 EIR.northwest.2009.low<-sort(EIR.merge.northwest.2009)[n.cir*0.025]
 EIR.northwest.2009.high<-sort(EIR.merge.northwest.2009)[n.cir*0.975]
-EC.merge.northwest.2009<-EIR.merge.5.2$EC+EIR.merge.6.2$EC+
+EC.merge.northwest.2009<-EIR.merge.6.2$EC+
   EIR.merge.7.2$EC+EIR.merge.8.2$EC+
   EIR.merge.9$EC+EIR.merge.10$EC
-EC.point.northwest.2009<-EIR.merge.5.2$Point.EC[1]+EIR.merge.6.2$Point.EC[1]+
+EC.point.northwest.2009<-EIR.merge.6.2$Point.EC[1]+
   EIR.merge.7.2$Point.EC[1]+EIR.merge.8.2$Point.EC[1]+
   EIR.merge.9$Point.EC[1]+EIR.merge.10$Point.EC[1]
-#-137446 (-143925, -129420)
 EC.northwest.2009.low<-sort(EC.merge.northwest.2009)[n.cir*0.025]
 EC.northwest.2009.high<-sort(EC.merge.northwest.2009)[n.cir*0.975]
 
@@ -3561,16 +3319,6 @@ Low<-c(1,2,3,4,5,6,7,9,10,15,16,25,27,28,31)
 Middle<-c(8,11,12,17,18,22,23,24,29,30)
 High<-c(13,14,19,20,21,26)
 #Low HBsAg prevalence
-Age.pop5<-mean(aggregate(Population.book~Time,
-                         data=Hepatitis.B.agegroup9[which(Hepatitis.B.agegroup9$Order==3|
-                                                            Hepatitis.B.agegroup9$Order==4|
-                                                            Hepatitis.B.agegroup9$Order==6|
-                                                            Hepatitis.B.agegroup9$Order==7|
-                                                            Hepatitis.B.agegroup9$Order==10|
-                                                            Hepatitis.B.agegroup9$Order==16|
-                                                            Hepatitis.B.agegroup9$Order==27|
-                                                            Hepatitis.B.agegroup9$Order==28|
-                                                            Hepatitis.B.agegroup9$Order==31),],FUN=sum)[,2])
 Age.pop6<-mean(aggregate(Population.book~Time,
                          data=Hepatitis.B.agegroup10[which(Hepatitis.B.agegroup10$Order>2&
                                                              Hepatitis.B.agegroup10$Order<8|
@@ -3625,44 +3373,32 @@ Age.pop10<-mean(aggregate(Population.book~Time,
                                                               Hepatitis.B.agegroup14$Order==27|
                                                               Hepatitis.B.agegroup14$Order==28|
                                                               Hepatitis.B.agegroup14$Order==31),],FUN=sum)[,2])
-Age.pop.2009<-c(Age.pop5,Age.pop6,Age.pop7,Age.pop8,Age.pop9,Age.pop10)
-Prop.pop.lowpr.2009<-c(Age.pop5/sum(Age.pop.2009),Age.pop6/sum(Age.pop.2009),Age.pop7/sum(Age.pop.2009),
+Age.pop.2009<-c(Age.pop6,Age.pop7,Age.pop8,Age.pop9,Age.pop10)
+Prop.pop.lowpr.2009<-c(Age.pop6/sum(Age.pop.2009),Age.pop7/sum(Age.pop.2009),
                        Age.pop8/sum(Age.pop.2009),Age.pop9/sum(Age.pop.2009),Age.pop10/sum(Age.pop.2009))
-EIR.merge.5.2<-EIR.merge.2009(c(3,4,6,7,10,16,27,28,31),Hepatitis.B.agegroup9,"model5",c(3,11),2/12,10000)
 EIR.merge.6.2<-EIR.merge.2009(c(3,4,5,6,7,10,15,16,25,27,28,31),Hepatitis.B.agegroup10,"model6",c(3,11),(2+12)/12,10000)
 EIR.merge.7.2<-EIR.merge.2009(c(1,2,3,4,5,6,7,9,10,15,16,25,27,28,31),Hepatitis.B.agegroup11,"model7",c(3,11),(2+2*12)/12,10000)
 EIR.merge.8.2<-EIR.merge.2009(c(1,2,3,4,5,6,7,9,10,15,16,25,27,28,31),Hepatitis.B.agegroup12,"model8",c(3,11),(2+7*12)/12,10000)
 EIR.merge.9<-EIR.merge.2009(c(1,2,3,4,5,6,7,9,10,15,16,25,27,28,31),Hepatitis.B.agegroup13,"model9",c(2,9),6,10000)
 EIR.merge.10<-EIR.merge.2009(c(1,2,3,4,5,6,7,9,10,15,16,25,27,28,31),Hepatitis.B.agegroup14,"model10",c(2,9),1,10000)
-EIR.merge.lowpr.2009<-Prop.pop.lowpr.2009[1]*EIR.merge.5.2$EIR+Prop.pop.lowpr.2009[2]*EIR.merge.6.2$EIR+
-  Prop.pop.lowpr.2009[3]*EIR.merge.7.2$EIR+Prop.pop.lowpr.2009[4]*EIR.merge.8.2$EIR+
-  Prop.pop.lowpr.2009[5]*EIR.merge.9$EIR+Prop.pop.lowpr.2009[6]*EIR.merge.10$EIR
-EIR.point.lowpr.2009<-Prop.pop.lowpr.2009[1]*EIR.merge.5.2$Point.EIR[1]+Prop.pop.lowpr.2009[2]*EIR.merge.6.2$Point.EIR[1]+
-  Prop.pop.lowpr.2009[3]*EIR.merge.7.2$Point.EIR[1]+Prop.pop.lowpr.2009[4]*EIR.merge.8.2$Point.EIR[1]+
-  Prop.pop.lowpr.2009[5]*EIR.merge.9$Point.EIR[1]+Prop.pop.lowpr.2009[6]*EIR.merge.10$Point.EIR[1]
-#-29.24 (-31.14, -26.61)
+EIR.merge.lowpr.2009<-Prop.pop.lowpr.2009[1]*EIR.merge.6.2$EIR+
+  Prop.pop.lowpr.2009[2]*EIR.merge.7.2$EIR+Prop.pop.lowpr.2009[3]*EIR.merge.8.2$EIR+
+  Prop.pop.lowpr.2009[4]*EIR.merge.9$EIR+Prop.pop.lowpr.2009[5]*EIR.merge.10$EIR
+EIR.point.lowpr.2009<-Prop.pop.lowpr.2009[1]*EIR.merge.6.2$Point.EIR[1]+
+  Prop.pop.lowpr.2009[2]*EIR.merge.7.2$Point.EIR[1]+Prop.pop.lowpr.2009[3]*EIR.merge.8.2$Point.EIR[1]+
+  Prop.pop.lowpr.2009[4]*EIR.merge.9$Point.EIR[1]+Prop.pop.lowpr.2009[5]*EIR.merge.10$Point.EIR[1]
 EIR.lowpr.2009.low<-sort(EIR.merge.lowpr.2009)[n.cir*0.025]
 EIR.lowpr.2009.high<-sort(EIR.merge.lowpr.2009)[n.cir*0.975]
-EC.merge.lowpr.2009<-EIR.merge.5.2$EC+EIR.merge.6.2$EC+
+EC.merge.lowpr.2009<-EIR.merge.6.2$EC+
   EIR.merge.7.2$EC+EIR.merge.8.2$EC+
   EIR.merge.9$EC+EIR.merge.10$EC
-EC.point.lowpr.2009<-EIR.merge.5.2$Point.EC[1]+EIR.merge.6.2$Point.EC[1]+
+EC.point.lowpr.2009<-EIR.merge.6.2$Point.EC[1]+
   EIR.merge.7.2$Point.EC[1]+EIR.merge.8.2$Point.EC[1]+
   EIR.merge.9$Point.EC[1]+EIR.merge.10$Point.EC[1]
-#-291069 (-303461, -275638)
 EC.lowpr.2009.low<-sort(EC.merge.lowpr.2009)[n.cir*0.025]
 EC.lowpr.2009.high<-sort(EC.merge.lowpr.2009)[n.cir*0.975]
 
 #Middle HBsAg prevalence
-Age.pop5<-mean(aggregate(Population.book~Time,
-                         data=Hepatitis.B.agegroup9[which(Hepatitis.B.agegroup9$Order==8|
-                                                            Hepatitis.B.agegroup9$Order==17|
-                                                            Hepatitis.B.agegroup9$Order==18|
-                                                            Hepatitis.B.agegroup9$Order==22|
-                                                            Hepatitis.B.agegroup9$Order==23|
-                                                            Hepatitis.B.agegroup9$Order==24|
-                                                            Hepatitis.B.agegroup9$Order==29|
-                                                            Hepatitis.B.agegroup9$Order==30),],FUN=sum)[,2])
 Age.pop6<-mean(aggregate(Population.book~Time,
                          data=Hepatitis.B.agegroup10[which(Hepatitis.B.agegroup10$Order==8|
                                                              Hepatitis.B.agegroup10$Order==11|
@@ -3718,39 +3454,32 @@ Age.pop10<-mean(aggregate(Population.book~Time,
                                                               Hepatitis.B.agegroup14$Order==24|
                                                               Hepatitis.B.agegroup14$Order==29|
                                                               Hepatitis.B.agegroup14$Order==30),],FUN=sum)[,2])
-Age.pop.2009<-c(Age.pop5,Age.pop6,Age.pop7,Age.pop8,Age.pop9,Age.pop10)
-Prop.pop.middlepr.2009<-c(Age.pop5/sum(Age.pop.2009),Age.pop6/sum(Age.pop.2009),Age.pop7/sum(Age.pop.2009),
+Age.pop.2009<-c(Age.pop6,Age.pop7,Age.pop8,Age.pop9,Age.pop10)
+Prop.pop.middlepr.2009<-c(Age.pop6/sum(Age.pop.2009),Age.pop7/sum(Age.pop.2009),
                           Age.pop8/sum(Age.pop.2009),Age.pop9/sum(Age.pop.2009),Age.pop10/sum(Age.pop.2009))
-EIR.merge.5.2<-EIR.merge.2009(c(8,17,18,22,23,24,29,30),Hepatitis.B.agegroup9,"model5",c(3,11),2/12,10000)
 EIR.merge.6.2<-EIR.merge.2009(c(8,11,12,17,18,22,23,24,29,30),Hepatitis.B.agegroup10,"model6",c(3,11),(2+12)/12,10000)
 EIR.merge.7.2<-EIR.merge.2009(c(8,11,12,17,18,22,23,24,29,30),Hepatitis.B.agegroup11,"model7",c(3,11),(2+2*12)/12,10000)
 EIR.merge.8.2<-EIR.merge.2009(c(8,11,12,17,18,22,23,24,29,30),Hepatitis.B.agegroup12,"model8",c(3,11),(2+7*12)/12,10000)
 EIR.merge.9<-EIR.merge.2009(c(8,11,12,17,18,22,23,24,29,30),Hepatitis.B.agegroup13,"model9",c(2,9),6,10000)
 EIR.merge.10<-EIR.merge.2009(c(8,11,12,17,18,22,23,24,29,30),Hepatitis.B.agegroup14,"model10",c(2,9),1,10000)
-EIR.merge.middlepr.2009<-Prop.pop.middlepr.2009[1]*EIR.merge.5.2$EIR+Prop.pop.middlepr.2009[2]*EIR.merge.6.2$EIR+
-  Prop.pop.middlepr.2009[3]*EIR.merge.7.2$EIR+Prop.pop.middlepr.2009[4]*EIR.merge.8.2$EIR+
-  Prop.pop.middlepr.2009[5]*EIR.merge.9$EIR+Prop.pop.middlepr.2009[6]*EIR.merge.10$EIR
-EIR.point.middlepr.2009<-Prop.pop.middlepr.2009[1]*EIR.merge.5.2$Point.EIR[1]+Prop.pop.middlepr.2009[2]*EIR.merge.6.2$Point.EIR[1]+
-  Prop.pop.middlepr.2009[3]*EIR.merge.7.2$Point.EIR[1]+Prop.pop.middlepr.2009[4]*EIR.merge.8.2$Point.EIR[1]+
-  Prop.pop.middlepr.2009[5]*EIR.merge.9$Point.EIR[1]+Prop.pop.middlepr.2009[6]*EIR.merge.10$Point.EIR[1]
-#-19.78 (-21.51, -17.49)
+EIR.merge.middlepr.2009<-Prop.pop.middlepr.2009[1]*EIR.merge.6.2$EIR+
+  Prop.pop.middlepr.2009[2]*EIR.merge.7.2$EIR+Prop.pop.middlepr.2009[3]*EIR.merge.8.2$EIR+
+  Prop.pop.middlepr.2009[4]*EIR.merge.9$EIR+Prop.pop.middlepr.2009[5]*EIR.merge.10$EIR
+EIR.point.middlepr.2009<-Prop.pop.middlepr.2009[1]*EIR.merge.6.2$Point.EIR[1]+
+  Prop.pop.middlepr.2009[2]*EIR.merge.7.2$Point.EIR[1]+Prop.pop.middlepr.2009[3]*EIR.merge.8.2$Point.EIR[1]+
+  Prop.pop.middlepr.2009[4]*EIR.merge.9$Point.EIR[1]+Prop.pop.middlepr.2009[5]*EIR.merge.10$Point.EIR[1]
 EIR.middlepr.2009.low<-sort(EIR.merge.middlepr.2009)[n.cir*0.025]
 EIR.middlepr.2009.high<-sort(EIR.merge.middlepr.2009)[n.cir*0.975]
-EC.merge.middlepr.2009<-EIR.merge.5.2$EC+EIR.merge.6.2$EC+
+EC.merge.middlepr.2009<-EIR.merge.6.2$EC+
   EIR.merge.7.2$EC+EIR.merge.8.2$EC+
   EIR.merge.9$EC+EIR.merge.10$EC
-EC.point.middlepr.2009<-EIR.merge.5.2$Point.EC[1]+EIR.merge.6.2$Point.EC[1]+
+EC.point.middlepr.2009<-EIR.merge.6.2$Point.EC[1]+
   EIR.merge.7.2$Point.EC[1]+EIR.merge.8.2$Point.EC[1]+
   EIR.merge.9$Point.EC[1]+EIR.merge.10$Point.EC[1]
-#-132733 (-140274, -123773)
 EC.middlepr.2009.low<-sort(EC.merge.middlepr.2009)[n.cir*0.025]
 EC.middlepr.2009.high<-sort(EC.merge.middlepr.2009)[n.cir*0.975]
 
 #High HBsAg prevalence
-Age.pop5<-mean(aggregate(Population.book~Time,
-                         data=Hepatitis.B.agegroup9[which(Hepatitis.B.agegroup9$Order==13|
-                                                            Hepatitis.B.agegroup9$Order==19|
-                                                            Hepatitis.B.agegroup9$Order==20),],FUN=sum)[,2])
 Age.pop6<-mean(aggregate(Population.book~Time,
                          data=Hepatitis.B.agegroup10[which(Hepatitis.B.agegroup10$Order==13|
                                                              Hepatitis.B.agegroup10$Order==14|
@@ -3785,31 +3514,28 @@ Age.pop10<-mean(aggregate(Population.book~Time,
                                                               Hepatitis.B.agegroup14$Order==20|
                                                               Hepatitis.B.agegroup14$Order==21|
                                                               Hepatitis.B.agegroup14$Order==26),],FUN=sum)[,2])
-Age.pop.2009<-c(Age.pop5,Age.pop6,Age.pop7,Age.pop8,Age.pop9,Age.pop10)
-Prop.pop.highpr.2009<-c(Age.pop5/sum(Age.pop.2009),Age.pop6/sum(Age.pop.2009),Age.pop7/sum(Age.pop.2009),
+Age.pop.2009<-c(Age.pop6,Age.pop7,Age.pop8,Age.pop9,Age.pop10)
+Prop.pop.highpr.2009<-c(Age.pop6/sum(Age.pop.2009),Age.pop7/sum(Age.pop.2009),
                         Age.pop8/sum(Age.pop.2009),Age.pop9/sum(Age.pop.2009),Age.pop10/sum(Age.pop.2009))
-EIR.merge.5.2<-EIR.merge.2009(c(13,19,20),Hepatitis.B.agegroup9,"model5",c(3,11),2/12,10000)
 EIR.merge.6.2<-EIR.merge.2009(c(13,14,19,20,21),Hepatitis.B.agegroup10,"model6",c(3,11),(2+12)/12,10000)
 EIR.merge.7.2<-EIR.merge.2009(c(13,14,19,20,21,26),Hepatitis.B.agegroup11,"model7",c(3,11),(2+2*12)/14,10000)
 EIR.merge.8.2<-EIR.merge.2009(c(13,14,19,20,21,26),Hepatitis.B.agegroup12,"model8",c(3,11),(2+7*12)/14,10000)
 EIR.merge.9<-EIR.merge.2009(c(13,14,19,20,21,26),Hepatitis.B.agegroup13,"model9",c(2,9),6,10000)
 EIR.merge.10<-EIR.merge.2009(c(13,14,19,20,21,26),Hepatitis.B.agegroup14,"model10",c(2,9),1,10000)
-EIR.merge.highpr.2009<-Prop.pop.highpr.2009[1]*EIR.merge.5.2$EIR+Prop.pop.highpr.2009[2]*EIR.merge.6.2$EIR+
-  Prop.pop.highpr.2009[3]*EIR.merge.7.2$EIR+Prop.pop.highpr.2009[4]*EIR.merge.8.2$EIR+
-  Prop.pop.highpr.2009[5]*EIR.merge.9$EIR+Prop.pop.highpr.2009[6]*EIR.merge.10$EIR
-EIR.point.highpr.2009<-Prop.pop.highpr.2009[1]*EIR.merge.5.2$Point.EIR[1]+Prop.pop.highpr.2009[2]*EIR.merge.6.2$Point.EIR[1]+
-  Prop.pop.highpr.2009[3]*EIR.merge.7.2$Point.EIR[1]+Prop.pop.highpr.2009[4]*EIR.merge.8.2$Point.EIR[1]+
-  Prop.pop.highpr.2009[5]*EIR.merge.9$Point.EIR[1]+Prop.pop.highpr.2009[6]*EIR.merge.10$Point.EIR[1]
-#-23.55 (-27.54, -18.80)
+EIR.merge.highpr.2009<-Prop.pop.highpr.2009[1]*EIR.merge.6.2$EIR+
+  Prop.pop.highpr.2009[2]*EIR.merge.7.2$EIR+Prop.pop.highpr.2009[3]*EIR.merge.8.2$EIR+
+  Prop.pop.highpr.2009[4]*EIR.merge.9$EIR+Prop.pop.highpr.2009[5]*EIR.merge.10$EIR
+EIR.point.highpr.2009<-Prop.pop.highpr.2009[1]*EIR.merge.6.2$Point.EIR[1]+
+  Prop.pop.highpr.2009[2]*EIR.merge.7.2$Point.EIR[1]+Prop.pop.highpr.2009[3]*EIR.merge.8.2$Point.EIR[1]+
+  Prop.pop.highpr.2009[4]*EIR.merge.9$Point.EIR[1]+Prop.pop.highpr.2009[5]*EIR.merge.10$Point.EIR[1]
 EIR.highpr.2009.low<-sort(EIR.merge.highpr.2009)[n.cir*0.025]
 EIR.highpr.2009.high<-sort(EIR.merge.highpr.2009)[n.cir*0.975]
-EC.merge.highpr.2009<-EIR.merge.5.2$EC+EIR.merge.6.2$EC+
+EC.merge.highpr.2009<-EIR.merge.6.2$EC+
   EIR.merge.7.2$EC+EIR.merge.8.2$EC+
   EIR.merge.9$EC+EIR.merge.10$EC
-EC.point.highpr.2009<-EIR.merge.5.2$Point.EC[1]+EIR.merge.6.2$Point.EC[1]+
+EC.point.highpr.2009<-EIR.merge.6.2$Point.EC[1]+
   EIR.merge.7.2$Point.EC[1]+EIR.merge.8.2$Point.EC[1]+
   EIR.merge.9$Point.EC[1]+EIR.merge.10$Point.EC[1]
-#-77129 (-87586, -64818)
 EC.highpr.2009.low<-sort(EC.merge.highpr.2009)[n.cir*0.025]
 EC.highpr.2009.high<-sort(EC.merge.highpr.2009)[n.cir*0.975]
 
@@ -3818,14 +3544,6 @@ EC.highpr.2009.high<-sort(EC.merge.highpr.2009)[n.cir*0.975]
 LowUR<-c(3,12,14,16,18,20,23:31)
 HighUR<-c(1,2,4,5,6,7,8,9,10,11,13,15,17,19,21,22)
 #Low urbanisation
-Age.pop5<-mean(aggregate(Population.book~Time,
-                         data=Hepatitis.B.agegroup9[which(Hepatitis.B.agegroup9$Order==3|
-                                                            Hepatitis.B.agegroup9$Order==16|
-                                                            Hepatitis.B.agegroup9$Order==18|
-                                                            Hepatitis.B.agegroup9$Order==20|
-                                                            Hepatitis.B.agegroup9$Order>22&
-                                                            Hepatitis.B.agegroup9$Order<25|
-                                                            Hepatitis.B.agegroup9$Order>26),],FUN=sum)[,2])
 Age.pop6<-mean(aggregate(Population.book~Time,
                          data=Hepatitis.B.agegroup10[which(Hepatitis.B.agegroup10$Order==3|
                                                              Hepatitis.B.agegroup10$Order==12|
@@ -3868,44 +3586,32 @@ Age.pop10<-mean(aggregate(Population.book~Time,
                                                               Hepatitis.B.agegroup14$Order==18|
                                                               Hepatitis.B.agegroup14$Order==20|
                                                               Hepatitis.B.agegroup14$Order>22),],FUN=sum)[,2])
-Age.pop.2009<-c(Age.pop5,Age.pop6,Age.pop7,Age.pop8,Age.pop9,Age.pop10)
-Prop.pop.lowur.2009<-c(Age.pop5/sum(Age.pop.2009),Age.pop6/sum(Age.pop.2009),Age.pop7/sum(Age.pop.2009),
+Age.pop.2009<-c(Age.pop6,Age.pop7,Age.pop8,Age.pop9,Age.pop10)
+Prop.pop.lowur.2009<-c(Age.pop6/sum(Age.pop.2009),Age.pop7/sum(Age.pop.2009),
                        Age.pop8/sum(Age.pop.2009),Age.pop9/sum(Age.pop.2009),Age.pop10/sum(Age.pop.2009))
-EIR.merge.5.2<-EIR.merge.2009(c(3,16,18,20,23,24,27:31),Hepatitis.B.agegroup9,"model5",c(3,11),2/12,10000)
 EIR.merge.6.2<-EIR.merge.2009(c(3,12,14,16,18,20,23:25,27:31),Hepatitis.B.agegroup10,"model6",c(3,11),(2+12)/12,10000)
 EIR.merge.7.2<-EIR.merge.2009(c(3,12,14,16,18,20,23:31),Hepatitis.B.agegroup11,"model7",c(3,11),(2+2*12)/12,10000)
 EIR.merge.8.2<-EIR.merge.2009(c(3,12,14,16,18,20,23:31),Hepatitis.B.agegroup12,"model8",c(3,11),(2+7*12)/12,10000)
 EIR.merge.9<-EIR.merge.2009(c(3,12,14,16,18,20,23:31),Hepatitis.B.agegroup13,"model9",c(2,9),6,10000)
 EIR.merge.10<-EIR.merge.2009(c(3,12,14,16,18,20,23:31),Hepatitis.B.agegroup14,"model10",c(2,9),1,10000)
-EIR.merge.lowur.2009<-Prop.pop.lowur.2009[1]*EIR.merge.5.2$EIR+Prop.pop.lowur.2009[2]*EIR.merge.6.2$EIR+
-  Prop.pop.lowur.2009[3]*EIR.merge.7.2$EIR+Prop.pop.lowur.2009[4]*EIR.merge.8.2$EIR+
-  Prop.pop.lowur.2009[5]*EIR.merge.9$EIR+Prop.pop.lowur.2009[6]*EIR.merge.10$EIR
-EIR.point.lowur.2009<-Prop.pop.lowur.2009[1]*EIR.merge.5.2$Point.EIR[1]+Prop.pop.lowur.2009[2]*EIR.merge.6.2$Point.EIR[1]+
-  Prop.pop.lowur.2009[3]*EIR.merge.7.2$Point.EIR[1]+Prop.pop.lowur.2009[4]*EIR.merge.8.2$Point.EIR[1]+
-  Prop.pop.lowur.2009[5]*EIR.merge.9$Point.EIR[1]+Prop.pop.lowur.2009[6]*EIR.merge.10$Point.EIR[1]
-#-32.60 (-34.58, -29.85)
+EIR.merge.lowur.2009<-Prop.pop.lowur.2009[1]*EIR.merge.6.2$EIR+
+  Prop.pop.lowur.2009[2]*EIR.merge.7.2$EIR+Prop.pop.lowur.2009[3]*EIR.merge.8.2$EIR+
+  Prop.pop.lowur.2009[4]*EIR.merge.9$EIR+Prop.pop.lowur.2009[5]*EIR.merge.10$EIR
+EIR.point.lowur.2009<-Prop.pop.lowur.2009[1]*EIR.merge.6.2$Point.EIR[1]+
+  Prop.pop.lowur.2009[2]*EIR.merge.7.2$Point.EIR[1]+Prop.pop.lowur.2009[3]*EIR.merge.8.2$Point.EIR[1]+
+  Prop.pop.lowur.2009[4]*EIR.merge.9$Point.EIR[1]+Prop.pop.lowur.2009[5]*EIR.merge.10$Point.EIR[1]
 EIR.lowur.2009.low<-sort(EIR.merge.lowur.2009)[n.cir*0.025]
 EIR.lowur.2009.high<-sort(EIR.merge.lowur.2009)[n.cir*0.975]
-EC.merge.lowur.2009<-EIR.merge.5.2$EC+EIR.merge.6.2$EC+
+EC.merge.lowur.2009<-EIR.merge.6.2$EC+
   EIR.merge.7.2$EC+EIR.merge.8.2$EC+
   EIR.merge.9$EC+EIR.merge.10$EC
-EC.point.lowur.2009<-EIR.merge.5.2$Point.EC[1]+EIR.merge.6.2$Point.EC[1]+
+EC.point.lowur.2009<-EIR.merge.6.2$Point.EC[1]+
   EIR.merge.7.2$Point.EC[1]+EIR.merge.8.2$Point.EC[1]+
   EIR.merge.9$Point.EC[1]+EIR.merge.10$Point.EC[1]
-#-347199 (-360660, -330535)
 EC.lowur.2009.low<-sort(EC.merge.lowur.2009)[n.cir*0.025]
 EC.lowur.2009.high<-sort(EC.merge.lowur.2009)[n.cir*0.975]
 
 #High urbanisation rate
-Age.pop5<-mean(aggregate(Population.book~Time,
-                         data=Hepatitis.B.agegroup9[which(Hepatitis.B.agegroup9$Order==4|
-                                                            Hepatitis.B.agegroup9$Order>5&
-                                                            Hepatitis.B.agegroup9$Order<9|
-                                                            Hepatitis.B.agegroup9$Order==10|
-                                                            Hepatitis.B.agegroup9$Order==13|
-                                                            Hepatitis.B.agegroup9$Order==17|
-                                                            Hepatitis.B.agegroup9$Order==19|
-                                                            Hepatitis.B.agegroup9$Order==22),],FUN=sum)[,2])
 Age.pop6<-mean(aggregate(Population.book~Time,
                          data=Hepatitis.B.agegroup10[which(Hepatitis.B.agegroup10$Order>3&
                                                              Hepatitis.B.agegroup10$Order<9|
@@ -3957,31 +3663,28 @@ Age.pop10<-mean(aggregate(Population.book~Time,
                                                               Hepatitis.B.agegroup14$Order==19|
                                                               Hepatitis.B.agegroup14$Order==21|
                                                               Hepatitis.B.agegroup14$Order==22),],FUN=sum)[,2])
-Age.pop.2009<-c(Age.pop5,Age.pop6,Age.pop7,Age.pop8,Age.pop9,Age.pop10)
-Prop.pop.highur.2009<-c(Age.pop5/sum(Age.pop.2009),Age.pop6/sum(Age.pop.2009),Age.pop7/sum(Age.pop.2009),
+Age.pop.2009<-c(Age.pop6,Age.pop7,Age.pop8,Age.pop9,Age.pop10)
+Prop.pop.highur.2009<-c(Age.pop6/sum(Age.pop.2009),Age.pop7/sum(Age.pop.2009),
                         Age.pop8/sum(Age.pop.2009),Age.pop9/sum(Age.pop.2009),Age.pop10/sum(Age.pop.2009))
-EIR.merge.5.2<-EIR.merge.2009(c(4,6,7,8,10,13,17,19,22),Hepatitis.B.agegroup9,"model5",c(3,11),2/12,10000)
 EIR.merge.6.2<-EIR.merge.2009(c(4,5,6,7,8,10,11,13,15,17,19,21,22),Hepatitis.B.agegroup10,"model6",c(3,11),(2+12)/12,10000)
 EIR.merge.7.2<-EIR.merge.2009(c(1,2,4,5,6,7,8,9,10,11,13,15,17,19,21,22),Hepatitis.B.agegroup11,"model7",c(3,11),(2+2*12)/12,10000)
 EIR.merge.8.2<-EIR.merge.2009(c(1,2,4,5,6,7,8,9,10,11,13,15,17,19,21,22),Hepatitis.B.agegroup12,"model8",c(3,11),(2+7*12)/12,10000)
 EIR.merge.9<-EIR.merge.2009(c(1,2,4,5,6,7,8,9,10,11,13,15,17,19,21,22),Hepatitis.B.agegroup13,"model9",c(2,9),6,10000)
 EIR.merge.10<-EIR.merge.2009(c(1,2,4,5,6,7,8,9,10,11,13,15,17,19,21,22),Hepatitis.B.agegroup14,"model10",c(2,9),1,10000)
-EIR.merge.highur.2009<-Prop.pop.highur.2009[1]*EIR.merge.5.2$EIR+Prop.pop.highur.2009[2]*EIR.merge.6.2$EIR+
-  Prop.pop.highur.2009[3]*EIR.merge.7.2$EIR+Prop.pop.highur.2009[4]*EIR.merge.8.2$EIR+
-  Prop.pop.highur.2009[5]*EIR.merge.9$EIR+Prop.pop.highur.2009[6]*EIR.merge.10$EIR
-EIR.point.highur.2009<-Prop.pop.highur.2009[1]*EIR.merge.5.2$Point.EIR[1]+Prop.pop.highur.2009[2]*EIR.merge.6.2$Point.EIR[1]+
-  Prop.pop.highur.2009[3]*EIR.merge.7.2$Point.EIR[1]+Prop.pop.highur.2009[4]*EIR.merge.8.2$Point.EIR[1]+
-  Prop.pop.highur.2009[5]*EIR.merge.9$Point.EIR[1]+Prop.pop.highur.2009[6]*EIR.merge.10$Point.EIR[1]
-#-17.25 (-18.98, -15.08)
+EIR.merge.highur.2009<-Prop.pop.highur.2009[1]*EIR.merge.6.2$EIR+
+  Prop.pop.highur.2009[2]*EIR.merge.7.2$EIR+Prop.pop.highur.2009[3]*EIR.merge.8.2$EIR+
+  Prop.pop.highur.2009[4]*EIR.merge.9$EIR+Prop.pop.highur.2009[5]*EIR.merge.10$EIR
+EIR.point.highur.2009<-Prop.pop.highur.2009[1]*EIR.merge.6.2$Point.EIR[1]+
+  Prop.pop.highur.2009[2]*EIR.merge.7.2$Point.EIR[1]+Prop.pop.highur.2009[3]*EIR.merge.8.2$Point.EIR[1]+
+  Prop.pop.highur.2009[4]*EIR.merge.9$Point.EIR[1]+Prop.pop.highur.2009[5]*EIR.merge.10$Point.EIR[1]
 EIR.highur.2009.low<-sort(EIR.merge.highur.2009)[n.cir*0.025]
 EIR.highur.2009.high<-sort(EIR.merge.highur.2009)[n.cir*0.975]
-EC.merge.highur.2009<-EIR.merge.5.2$EC+EIR.merge.6.2$EC+
+EC.merge.highur.2009<-EIR.merge.6.2$EC+
   EIR.merge.7.2$EC+EIR.merge.8.2$EC+
   EIR.merge.9$EC+EIR.merge.10$EC
-EC.point.highur.2009<-EIR.merge.5.2$Point.EC[1]+EIR.merge.6.2$Point.EC[1]+
+EC.point.highur.2009<-EIR.merge.6.2$Point.EC[1]+
   EIR.merge.7.2$Point.EC[1]+EIR.merge.8.2$Point.EC[1]+
   EIR.merge.9$Point.EC[1]+EIR.merge.10$Point.EC[1]
-#-153732 (-165697, -139885)
 EC.highur.2009.low<-sort(EC.merge.highur.2009)[n.cir*0.025]
 EC.highur.2009.high<-sort(EC.merge.highur.2009)[n.cir*0.975]
 
@@ -3990,15 +3693,6 @@ EC.highur.2009.high<-sort(EC.merge.highur.2009)[n.cir*0.975]
 LowHB<-c(3,11:14,16,18:22,24:26,28)
 HighHB<-c(1,2,4,5,6,7,8,9,10,15,17,23,27,29,30,31)
 #Low hospitalisation bed density
-Age.pop5<-mean(aggregate(Population.book~Time,
-                         data=Hepatitis.B.agegroup9[which(Hepatitis.B.agegroup9$Order==3|
-                                                            Hepatitis.B.agegroup9$Order==13|
-                                                            Hepatitis.B.agegroup9$Order==16|
-                                                            Hepatitis.B.agegroup9$Order>17&
-                                                            Hepatitis.B.agegroup9$Order<21|
-                                                            Hepatitis.B.agegroup9$Order==22|
-                                                            Hepatitis.B.agegroup9$Order==24|
-                                                            Hepatitis.B.agegroup9$Order==28),],FUN=sum)[,2])
 Age.pop6<-mean(aggregate(Population.book~Time,
                          data=Hepatitis.B.agegroup10[which(Hepatitis.B.agegroup10$Order==3|
                                                              Hepatitis.B.agegroup10$Order>10&
@@ -4053,46 +3747,32 @@ Age.pop10<-mean(aggregate(Population.book~Time,
                                                               Hepatitis.B.agegroup14$Order==25|
                                                               Hepatitis.B.agegroup14$Order==26|
                                                               Hepatitis.B.agegroup14$Order==28),],FUN=sum)[,2])
-Age.pop.2009<-c(Age.pop5,Age.pop6,Age.pop7,Age.pop8,Age.pop9,Age.pop10)
-Prop.pop.lowhb.2009<-c(Age.pop5/sum(Age.pop.2009),Age.pop6/sum(Age.pop.2009),Age.pop7/sum(Age.pop.2009),
+Age.pop.2009<-c(Age.pop6,Age.pop7,Age.pop8,Age.pop9,Age.pop10)
+Prop.pop.lowhb.2009<-c(Age.pop6/sum(Age.pop.2009),Age.pop7/sum(Age.pop.2009),
                        Age.pop8/sum(Age.pop.2009),Age.pop9/sum(Age.pop.2009),Age.pop10/sum(Age.pop.2009))
-EIR.merge.5.2<-EIR.merge.2009(c(3,13,16,18:20,22,24,28),Hepatitis.B.agegroup9,"model5",c(3,11),2/12,10000)
 EIR.merge.6.2<-EIR.merge.2009(c(3,11:14,16,18:22,24:25,28),Hepatitis.B.agegroup10,"model6",c(3,11),(2+12)/12,10000)
 EIR.merge.7.2<-EIR.merge.2009(c(3,11:14,16,18:22,24:26,28),Hepatitis.B.agegroup11,"model7",c(3,11),(2+2*12)/12,10000)
 EIR.merge.8.2<-EIR.merge.2009(c(3,11:14,16,18:22,24:26,28),Hepatitis.B.agegroup12,"model8",c(3,11),(2+7*12)/12,10000)
 EIR.merge.9<-EIR.merge.2009(c(3,11:14,16,18:22,24:26,28),Hepatitis.B.agegroup13,"model9",c(2,9),6,10000)
 EIR.merge.10<-EIR.merge.2009(c(3,11:14,16,18:22,24:26,28),Hepatitis.B.agegroup14,"model10",c(2,9),1,10000)
-EIR.merge.lowhb.2009<-Prop.pop.lowhb.2009[1]*EIR.merge.5.2$EIR+Prop.pop.lowhb.2009[2]*EIR.merge.6.2$EIR+
-  Prop.pop.lowhb.2009[3]*EIR.merge.7.2$EIR+Prop.pop.lowhb.2009[4]*EIR.merge.8.2$EIR+
-  Prop.pop.lowhb.2009[5]*EIR.merge.9$EIR+Prop.pop.lowhb.2009[6]*EIR.merge.10$EIR
-EIR.point.lowhb.2009<-Prop.pop.lowhb.2009[1]*EIR.merge.5.2$Point.EIR[1]+Prop.pop.lowhb.2009[2]*EIR.merge.6.2$Point.EIR[1]+
-  Prop.pop.lowhb.2009[3]*EIR.merge.7.2$Point.EIR[1]+Prop.pop.lowhb.2009[4]*EIR.merge.8.2$Point.EIR[1]+
-  Prop.pop.lowhb.2009[5]*EIR.merge.9$Point.EIR[1]+Prop.pop.lowhb.2009[6]*EIR.merge.10$Point.EIR[1]
-#-27.83 (-29.80, -25.18)
+EIR.merge.lowhb.2009<-Prop.pop.lowhb.2009[1]*EIR.merge.6.2$EIR+
+  Prop.pop.lowhb.2009[2]*EIR.merge.7.2$EIR+Prop.pop.lowhb.2009[3]*EIR.merge.8.2$EIR+
+  Prop.pop.lowhb.2009[4]*EIR.merge.9$EIR+Prop.pop.lowhb.2009[5]*EIR.merge.10$EIR
+EIR.point.lowhb.2009<-Prop.pop.lowhb.2009[1]*EIR.merge.6.2$Point.EIR[1]+
+  Prop.pop.lowhb.2009[2]*EIR.merge.7.2$Point.EIR[1]+Prop.pop.lowhb.2009[3]*EIR.merge.8.2$Point.EIR[1]+
+  Prop.pop.lowhb.2009[4]*EIR.merge.9$Point.EIR[1]+Prop.pop.lowhb.2009[5]*EIR.merge.10$Point.EIR[1]
 EIR.lowhb.2009.low<-sort(EIR.merge.lowhb.2009)[n.cir*0.025]
 EIR.lowhb.2009.high<-sort(EIR.merge.lowhb.2009)[n.cir*0.975]
-EC.merge.lowhb.2009<-EIR.merge.5.2$EC+EIR.merge.6.2$EC+
+EC.merge.lowhb.2009<-EIR.merge.6.2$EC+
   EIR.merge.7.2$EC+EIR.merge.8.2$EC+
   EIR.merge.9$EC+EIR.merge.10$EC
-EC.point.lowhb.2009<-EIR.merge.5.2$Point.EC[1]+EIR.merge.6.2$Point.EC[1]+
+EC.point.lowhb.2009<-EIR.merge.6.2$Point.EC[1]+
   EIR.merge.7.2$Point.EC[1]+EIR.merge.8.2$Point.EC[1]+
   EIR.merge.9$Point.EC[1]+EIR.merge.10$Point.EC[1]
-#-319852 (-334744, -301519)
 EC.lowhb.2009.low<-sort(EC.merge.lowhb.2009)[n.cir*0.025]
 EC.lowhb.2009.high<-sort(EC.merge.lowhb.2009)[n.cir*0.975]
 
 #High hospitalisation bed density
-Age.pop5<-mean(aggregate(Population.book~Time,
-                         data=Hepatitis.B.agegroup9[which(Hepatitis.B.agegroup9$Order==3|
-                                                            Hepatitis.B.agegroup9$Order>5&
-                                                            Hepatitis.B.agegroup9$Order<9|
-                                                            Hepatitis.B.agegroup9$Order==10|
-                                                            Hepatitis.B.agegroup9$Order==17|
-                                                            Hepatitis.B.agegroup9$Order==23|
-                                                            Hepatitis.B.agegroup9$Order==27|
-                                                            Hepatitis.B.agegroup9$Order==29|
-                                                            Hepatitis.B.agegroup9$Order==30|
-                                                            Hepatitis.B.agegroup9$Order==31),],FUN=sum)[,2])
 Age.pop6<-mean(aggregate(Population.book~Time,
                          data=Hepatitis.B.agegroup10[which(Hepatitis.B.agegroup10$Order>3&
                                                              Hepatitis.B.agegroup10$Order<9|
@@ -4152,31 +3832,28 @@ Age.pop10<-mean(aggregate(Population.book~Time,
                                                               Hepatitis.B.agegroup10$Order==29|
                                                               Hepatitis.B.agegroup10$Order==30|
                                                               Hepatitis.B.agegroup10$Order==31),],FUN=sum)[,2])
-Age.pop.2009<-c(Age.pop5,Age.pop6,Age.pop7,Age.pop8,Age.pop9,Age.pop10)
-Prop.pop.highhb.2009<-c(Age.pop5/sum(Age.pop.2009),Age.pop6/sum(Age.pop.2009),Age.pop7/sum(Age.pop.2009),
+Age.pop.2009<-c(Age.pop6,Age.pop7,Age.pop8,Age.pop9,Age.pop10)
+Prop.pop.highhb.2009<-c(Age.pop6/sum(Age.pop.2009),Age.pop7/sum(Age.pop.2009),
                         Age.pop8/sum(Age.pop.2009),Age.pop9/sum(Age.pop.2009),Age.pop10/sum(Age.pop.2009))
-EIR.merge.5.2<-EIR.merge.2009(c(4,6,7,8,10,17,23,27,29,30,31),Hepatitis.B.agegroup9,"model5",c(3,11),2/12,10000)
 EIR.merge.6.2<-EIR.merge.2009(c(4,5,6,7,8,10,15,17,23,27,29,30,31),Hepatitis.B.agegroup10,"model6",c(3,11),(2+12)/12,10000)
 EIR.merge.7.2<-EIR.merge.2009(c(1,2,4,5,6,7,8,9,10,15,17,23,27,29,30,31),Hepatitis.B.agegroup11,"model7",c(3,11),(2+2*12)/12,10000)
 EIR.merge.8.2<-EIR.merge.2009(c(1,2,4,5,6,7,8,9,10,15,17,23,27,29,30,31),Hepatitis.B.agegroup12,"model8",c(3,11),(2+7*12)/12,10000)
 EIR.merge.9<-EIR.merge.2009(c(1,2,4,5,6,7,8,9,10,15,17,23,27,29,30,31),Hepatitis.B.agegroup13,"model9",c(2,9),6,10000)
 EIR.merge.10<-EIR.merge.2009(c(1,2,4,5,6,7,8,9,10,15,17,23,27,29,30,31),Hepatitis.B.agegroup14,"model10",c(2,9),1,10000)
-EIR.merge.highhb.2009<-Prop.pop.highhb.2009[1]*EIR.merge.5.2$EIR+Prop.pop.highhb.2009[2]*EIR.merge.6.2$EIR+
-  Prop.pop.highhb.2009[3]*EIR.merge.7.2$EIR+Prop.pop.highhb.2009[4]*EIR.merge.8.2$EIR+
-  Prop.pop.highhb.2009[5]*EIR.merge.9$EIR+Prop.pop.highhb.2009[6]*EIR.merge.10$EIR
-EIR.point.highhb.2009<-Prop.pop.highhb.2009[1]*EIR.merge.5.2$Point.EIR[1]+Prop.pop.highhb.2009[2]*EIR.merge.6.2$Point.EIR[1]+
-  Prop.pop.highhb.2009[3]*EIR.merge.7.2$Point.EIR[1]+Prop.pop.highhb.2009[4]*EIR.merge.8.2$Point.EIR[1]+
-  Prop.pop.highhb.2009[5]*EIR.merge.9$Point.EIR[1]+Prop.pop.highhb.2009[6]*EIR.merge.10$Point.EIR[1]
-#-21.11 (-22.56, -19.04)
+EIR.merge.highhb.2009<-Prop.pop.highhb.2009[1]*EIR.merge.6.2$EIR+
+  Prop.pop.highhb.2009[2]*EIR.merge.7.2$EIR+Prop.pop.highhb.2009[3]*EIR.merge.8.2$EIR+
+  Prop.pop.highhb.2009[4]*EIR.merge.9$EIR+Prop.pop.highhb.2009[5]*EIR.merge.10$EIR
+EIR.point.highhb.2009<-Prop.pop.highhb.2009[1]*EIR.merge.6.2$Point.EIR[1]+
+  Prop.pop.highhb.2009[2]*EIR.merge.7.2$Point.EIR[1]+Prop.pop.highhb.2009[3]*EIR.merge.8.2$Point.EIR[1]+
+  Prop.pop.highhb.2009[4]*EIR.merge.9$Point.EIR[1]+Prop.pop.highhb.2009[5]*EIR.merge.10$Point.EIR[1]
 EIR.highhb.2009.low<-sort(EIR.merge.highhb.2009)[n.cir*0.025]
 EIR.highhb.2009.high<-sort(EIR.merge.highhb.2009)[n.cir*0.975]
-EC.merge.highhb.2009<-EIR.merge.5.2$EC+EIR.merge.6.2$EC+
+EC.merge.highhb.2009<-EIR.merge.6.2$EC+
   EIR.merge.7.2$EC+EIR.merge.8.2$EC+
   EIR.merge.9$EC+EIR.merge.10$EC
-EC.point.highhb.2009<-EIR.merge.5.2$Point.EC[1]+EIR.merge.6.2$Point.EC[1]+
+EC.point.highhb.2009<-EIR.merge.6.2$Point.EC[1]+
   EIR.merge.7.2$Point.EC[1]+EIR.merge.8.2$Point.EC[1]+
   EIR.merge.9$Point.EC[1]+EIR.merge.10$Point.EC[1]
-#-181079 (-190265, -169685)
 EC.highhb.2009.low<-sort(EC.merge.highhb.2009)[n.cir*0.025]
 EC.highhb.2009.high<-sort(EC.merge.highhb.2009)[n.cir*0.975]
 
@@ -4185,16 +3862,6 @@ EC.highhb.2009.high<-sort(EC.merge.highhb.2009)[n.cir*0.975]
 LowIR<-c(1:10,14,18,19,20,21,31)
 HighIR<-c(11,12,13,15,16,17,22:30)
 #Low illiteracy rate
-Age.pop5<-mean(aggregate(Population.book~Time,
-                         data=Hepatitis.B.agegroup9[which(Hepatitis.B.agegroup9$Order>2&
-                                                            Hepatitis.B.agegroup9$Order<5|
-                                                            Hepatitis.B.agegroup9$Order>5&
-                                                            Hepatitis.B.agegroup9$Order<9|
-                                                            Hepatitis.B.agegroup9$Order==10|
-                                                            Hepatitis.B.agegroup9$Order==18|
-                                                            Hepatitis.B.agegroup9$Order==19|
-                                                            Hepatitis.B.agegroup9$Order==20|
-                                                            Hepatitis.B.agegroup9$Order==31),],FUN=sum)[,2])
 Age.pop6<-mean(aggregate(Population.book~Time,
                          data=Hepatitis.B.agegroup10[which(Hepatitis.B.agegroup10$Order>2&
                                                              Hepatitis.B.agegroup10$Order<9|
@@ -4237,43 +3904,32 @@ Age.pop10<-mean(aggregate(Population.book~Time,
                                                               Hepatitis.B.agegroup14$Order==20|
                                                               Hepatitis.B.agegroup14$Order==21|
                                                               Hepatitis.B.agegroup14$Order==31),],FUN=sum)[,2])
-Age.pop.2009<-c(Age.pop5,Age.pop6,Age.pop7,Age.pop8,Age.pop9,Age.pop10)
-Prop.pop.lowir.2009<-c(Age.pop5/sum(Age.pop.2009),Age.pop6/sum(Age.pop.2009),Age.pop7/sum(Age.pop.2009),
+Age.pop.2009<-c(Age.pop6,Age.pop7,Age.pop8,Age.pop9,Age.pop10)
+Prop.pop.lowir.2009<-c(Age.pop6/sum(Age.pop.2009),Age.pop7/sum(Age.pop.2009),
                        Age.pop8/sum(Age.pop.2009),Age.pop9/sum(Age.pop.2009),Age.pop10/sum(Age.pop.2009))
-EIR.merge.5.2<-EIR.merge.2009(c(3:4,6:8,10,18,19,20,31),Hepatitis.B.agegroup9,"model5",c(3,11),2/12,10000)
 EIR.merge.6.2<-EIR.merge.2009(c(3:8,10,14,18,19,20,21,31),Hepatitis.B.agegroup10,"model6",c(3,11),(2+12)/12,10000)
 EIR.merge.7.2<-EIR.merge.2009(c(1:10,14,18,19,20,21,31),Hepatitis.B.agegroup11,"model7",c(3,11),(2+2*12)/12,10000)
 EIR.merge.8.2<-EIR.merge.2009(c(1:10,14,18,19,20,21,31),Hepatitis.B.agegroup12,"model8",c(3,11),(2+7*12)/12,10000)
 EIR.merge.9<-EIR.merge.2009(c(1:10,14,18,19,20,21,31),Hepatitis.B.agegroup13,"model9",c(2,9),6,10000)
 EIR.merge.10<-EIR.merge.2009(c(1:10,14,18,19,20,21,31),Hepatitis.B.agegroup14,"model10",c(2,9),1,10000)
-EIR.merge.lowir.2009<-Prop.pop.lowir.2009[1]*EIR.merge.5.2$EIR+Prop.pop.lowir.2009[2]*EIR.merge.6.2$EIR+
-  Prop.pop.lowir.2009[3]*EIR.merge.7.2$EIR+Prop.pop.lowir.2009[4]*EIR.merge.8.2$EIR+
-  Prop.pop.lowir.2009[5]*EIR.merge.9$EIR+Prop.pop.lowir.2009[6]*EIR.merge.10$EIR
-EIR.point.lowir.2009<-Prop.pop.lowir.2009[1]*EIR.merge.5.2$Point.EIR[1]+Prop.pop.lowir.2009[2]*EIR.merge.6.2$Point.EIR[1]+
-  Prop.pop.lowir.2009[3]*EIR.merge.7.2$Point.EIR[1]+Prop.pop.lowir.2009[4]*EIR.merge.8.2$Point.EIR[1]+
-  Prop.pop.lowir.2009[5]*EIR.merge.9$Point.EIR[1]+Prop.pop.lowir.2009[6]*EIR.merge.10$Point.EIR[1]
-#-27.55 (-29.37, -25.28)
+EIR.merge.lowir.2009<-Prop.pop.lowir.2009[1]*EIR.merge.6.2$EIR+
+  Prop.pop.lowir.2009[2]*EIR.merge.7.2$EIR+Prop.pop.lowir.2009[3]*EIR.merge.8.2$EIR+
+  Prop.pop.lowir.2009[4]*EIR.merge.9$EIR+Prop.pop.lowir.2009[5]*EIR.merge.10$EIR
+EIR.point.lowir.2009<-Prop.pop.lowir.2009[1]*EIR.merge.6.2$Point.EIR[1]+
+  Prop.pop.lowir.2009[2]*EIR.merge.7.2$Point.EIR[1]+Prop.pop.lowir.2009[3]*EIR.merge.8.2$Point.EIR[1]+
+  Prop.pop.lowir.2009[4]*EIR.merge.9$Point.EIR[1]+Prop.pop.lowir.2009[5]*EIR.merge.10$Point.EIR[1]
 EIR.lowir.2009.low<-sort(EIR.merge.lowir.2009)[n.cir*0.025]
 EIR.lowir.2009.high<-sort(EIR.merge.lowir.2009)[n.cir*0.975]
-EC.merge.lowir.2009<-EIR.merge.5.2$EC+EIR.merge.6.2$EC+
+EC.merge.lowir.2009<-EIR.merge.6.2$EC+
   EIR.merge.7.2$EC+EIR.merge.8.2$EC+
   EIR.merge.9$EC+EIR.merge.10$EC
-EC.point.lowir.2009<-EIR.merge.5.2$Point.EC[1]+EIR.merge.6.2$Point.EC[1]+
+EC.point.lowir.2009<-EIR.merge.6.2$Point.EC[1]+
   EIR.merge.7.2$Point.EC[1]+EIR.merge.8.2$Point.EC[1]+
   EIR.merge.9$Point.EC[1]+EIR.merge.10$Point.EC[1]
-#-261475 (-275709, -246054)
 EC.lowir.2009.low<-sort(EC.merge.lowir.2009)[n.cir*0.025]
 EC.lowir.2009.high<-sort(EC.merge.lowir.2009)[n.cir*0.975]
 
 #High illiteracy rate
-Age.pop5<-mean(aggregate(Population.book~Time,
-                         data=Hepatitis.B.agegroup9[which(Hepatitis.B.agegroup9$Order==13|
-                                                            Hepatitis.B.agegroup9$Order==16|
-                                                            Hepatitis.B.agegroup9$Order==17|
-                                                            Hepatitis.B.agegroup9$Order>21&
-                                                            Hepatitis.B.agegroup9$Order<25|
-                                                            Hepatitis.B.agegroup9$Order>26|
-                                                            Hepatitis.B.agegroup9$Order<31),],FUN=sum)[,2])
 Age.pop6<-mean(aggregate(Population.book~Time,
                          data=Hepatitis.B.agegroup10[which(Hepatitis.B.agegroup10$Order==11|
                                                              Hepatitis.B.agegroup10$Order==12|
@@ -4321,31 +3977,28 @@ Age.pop10<-mean(aggregate(Population.book~Time,
                                                               Hepatitis.B.agegroup14$Order==17|
                                                               Hepatitis.B.agegroup14$Order>21&
                                                               Hepatitis.B.agegroup14$Order<31),],FUN=sum)[,2])
-Age.pop.2009<-c(Age.pop5,Age.pop6,Age.pop7,Age.pop8,Age.pop9,Age.pop10)
-Prop.pop.highir.2009<-c(Age.pop5/sum(Age.pop.2009),Age.pop6/sum(Age.pop.2009),Age.pop7/sum(Age.pop.2009),
+Age.pop.2009<-c(Age.pop6,Age.pop7,Age.pop8,Age.pop9,Age.pop10)
+Prop.pop.highir.2009<-c(Age.pop6/sum(Age.pop.2009),Age.pop7/sum(Age.pop.2009),
                         Age.pop8/sum(Age.pop.2009),Age.pop9/sum(Age.pop.2009),Age.pop10/sum(Age.pop.2009))
-EIR.merge.5.2<-EIR.merge.2009(c(13,16,17,22:24,27:30),Hepatitis.B.agegroup9,"model5",c(3,11),2/12,10000)
 EIR.merge.6.2<-EIR.merge.2009(c(11,12,13,15,16,17,22:25,27:30),Hepatitis.B.agegroup10,"model6",c(3,11),(2+12)/12,10000)
 EIR.merge.7.2<-EIR.merge.2009(c(11,12,13,15,16,17,22:30),Hepatitis.B.agegroup11,"model7",c(3,11),(2+2*12)/12,10000)
 EIR.merge.8.2<-EIR.merge.2009(c(11,12,13,15,16,17,22:30),Hepatitis.B.agegroup12,"model8",c(3,11),(2+7*12)/12,10000)
 EIR.merge.9<-EIR.merge.2009(c(11,12,13,15,16,17,22:30),Hepatitis.B.agegroup13,"model9",c(2,9),6,10000)
 EIR.merge.10<-EIR.merge.2009(c(11,12,13,15,16,17,22:30),Hepatitis.B.agegroup14,"model10",c(2,9),1,10000)
-EIR.merge.highir.2009<-Prop.pop.highir.2009[1]*EIR.merge.5.2$EIR+Prop.pop.highir.2009[2]*EIR.merge.6.2$EIR+
-  Prop.pop.highir.2009[3]*EIR.merge.7.2$EIR+Prop.pop.highir.2009[4]*EIR.merge.8.2$EIR+
-  Prop.pop.highir.2009[5]*EIR.merge.9$EIR+Prop.pop.highir.2009[6]*EIR.merge.10$EIR
-EIR.point.highir.2009<-Prop.pop.highir.2009[1]*EIR.merge.5.2$Point.EIR[1]+Prop.pop.highir.2009[2]*EIR.merge.6.2$Point.EIR[1]+
-  Prop.pop.highir.2009[3]*EIR.merge.7.2$Point.EIR[1]+Prop.pop.highir.2009[4]*EIR.merge.8.2$Point.EIR[1]+
-  Prop.pop.highir.2009[5]*EIR.merge.9$Point.EIR[1]+Prop.pop.highir.2009[6]*EIR.merge.10$Point.EIR[1]
-#-20.76 (-22.61, -17.89)
+EIR.merge.highir.2009<-Prop.pop.highir.2009[1]*EIR.merge.6.2$EIR+
+  Prop.pop.highir.2009[2]*EIR.merge.7.2$EIR+Prop.pop.highir.2009[3]*EIR.merge.8.2$EIR+
+  Prop.pop.highir.2009[4]*EIR.merge.9$EIR+Prop.pop.highir.2009[5]*EIR.merge.10$EIR
+EIR.point.highir.2009<-Prop.pop.highir.2009[1]*EIR.merge.6.2$Point.EIR[1]+
+  Prop.pop.highir.2009[2]*EIR.merge.7.2$Point.EIR[1]+Prop.pop.highir.2009[3]*EIR.merge.8.2$Point.EIR[1]+
+  Prop.pop.highir.2009[4]*EIR.merge.9$Point.EIR[1]+Prop.pop.highir.2009[5]*EIR.merge.10$Point.EIR[1]
 EIR.highir.2009.low<-sort(EIR.merge.highir.2009)[n.cir*0.025]
 EIR.highir.2009.high<-sort(EIR.merge.highir.2009)[n.cir*0.975]
-EC.merge.highir.2009<-EIR.merge.5.2$EC+EIR.merge.6.2$EC+
+EC.merge.highir.2009<-EIR.merge.6.2$EC+
   EIR.merge.7.2$EC+EIR.merge.8.2$EC+
   EIR.merge.9$EC+EIR.merge.10$EC
-EC.point.highir.2009<-EIR.merge.5.2$Point.EC[1]+EIR.merge.6.2$Point.EC[1]+
+EC.point.highir.2009<-EIR.merge.6.2$Point.EC[1]+
   EIR.merge.7.2$Point.EC[1]+EIR.merge.8.2$Point.EC[1]+
   EIR.merge.9$Point.EC[1]+EIR.merge.10$Point.EC[1]
-#-239456 (-251551, -223869)
 EC.highir.2009.low<-sort(EC.merge.highir.2009)[n.cir*0.025]
 EC.highir.2009.high<-sort(EC.merge.highir.2009)[n.cir*0.975]
 
@@ -4439,8 +4092,7 @@ for(i in c(1,2,9,26)){
   Pop8<-mean(Hepatitis.B.agegroup12$Population.book[
     which(Hepatitis.B.agegroup12$Order==i)])
   Pop<-c(Pop7,Pop8)
-  Sd<-1/c(prod(diag(s7[[1]])),prod(diag(s8[[1]])))
-  Prop1.1<-c(Pop[1]*Sd[1]/sum(Pop*Sd),Pop[2]*Sd[2]/sum(Pop*Sd))
+  Prop1.1<-c(Pop[1]/sum(Pop),Pop[2]/sum(Pop))
   model.number1<-eval(parse(text=paste("model7.",i,sep="")))
   model.number2<-eval(parse(text=paste("model8.",i,sep="")))
   yori.specific[i,]<-y7*Prop1.1[1]+y8*Prop1.1[2]
@@ -4496,12 +4148,9 @@ for(i in c(6)){
   Pop8<-mean(Hepatitis.B.agegroup12$Population.book[
     which(Hepatitis.B.agegroup12$Order==i)])
   Pop<-c(Pop3,Pop4,Pop5,Pop6,Pop7,Pop8)
-  Sd<-1/c(prod(diag(s3[[1]])),prod(diag(s4[[1]])),
-          prod(diag(s5[[1]])),prod(diag(s6[[1]])),
-          prod(diag(s7[[1]])),prod(diag(s8[[1]])))
-  Prop1.2<-c(Pop[1]*Sd[1]/sum(Pop*Sd),Pop[2]*Sd[2]/sum(Pop*Sd),
-             Pop[3]*Sd[3]/sum(Pop*Sd),Pop[4]*Sd[4]/sum(Pop*Sd),
-             Pop[5]*Sd[5]/sum(Pop*Sd),Pop[6]*Sd[6]/sum(Pop*Sd))
+  Prop1.2<-c(Pop[1]/sum(Pop),Pop[2]/sum(Pop),
+             Pop[3]/sum(Pop),Pop[4]/sum(Pop),
+             Pop[5]/sum(Pop),Pop[6]/sum(Pop))
   model.number1<-eval(parse(text=paste("model3.",i,sep="")))
   model.number2<-eval(parse(text=paste("model4.",i,sep="")))
   model.number3<-eval(parse(text=paste("model5.",i,sep="")))
@@ -4575,10 +4224,7 @@ for(i in c(14)){
   Pop8<-mean(Hepatitis.B.agegroup12$Population.book[
     which(Hepatitis.B.agegroup12$Order==i)])
   Pop<-c(Pop2,Pop7,Pop8)
-  Sd<-1/c(prod(diag(s2[[1]])),
-          prod(diag(s7[[1]])),prod(diag(s8[[1]])))
-  Prop1.3<-c(Pop[1]*Sd[1]/sum(Pop*Sd),Pop[2]*Sd[2]/sum(Pop*Sd),
-             Pop[3]*Sd[3]/sum(Pop*Sd))
+  Prop1.3<-c(Pop[1]/sum(Pop),Pop[2]/sum(Pop),Pop[3]/sum(Pop))
   model.number1<-eval(parse(text=paste("model2.",i,sep="")))
   model.number2<-eval(parse(text=paste("model7.",i,sep="")))
   model.number3<-eval(parse(text=paste("model8.",i,sep="")))
@@ -4644,14 +4290,9 @@ for(i in c(3:5,7,8,10:13,15:25,27:31)){
   Pop8<-mean(Hepatitis.B.agegroup12$Population.book[
     which(Hepatitis.B.agegroup12$Order==i)])
   Pop<-c(Pop2,Pop3,Pop4,Pop5,Pop6,Pop7,Pop8)
-  Sd<-1/c(prod(diag(s2[[1]])),
-          prod(diag(s3[[1]])),prod(diag(s4[[1]])),
-          prod(diag(s5[[1]])),prod(diag(s6[[1]])),
-          prod(diag(s7[[1]])),prod(diag(s8[[1]])))
-  Prop1.4<-c(Pop[1]*Sd[1]/sum(Pop*Sd),Pop[2]*Sd[2]/sum(Pop*Sd),
-             Pop[3]*Sd[3]/sum(Pop*Sd),Pop[4]*Sd[4]/sum(Pop*Sd),
-             Pop[5]*Sd[5]/sum(Pop*Sd),Pop[6]*Sd[6]/sum(Pop*Sd),
-             Pop[7]*Sd[7]/sum(Pop*Sd))
+  Prop1.4<-c(Pop[1]/sum(Pop),Pop[2]/sum(Pop),
+             Pop[3]/sum(Pop),Pop[4]/sum(Pop),
+             Pop[5]/sum(Pop),Pop[6]/sum(Pop),Pop[7]/sum(Pop))
   model.number1<-eval(parse(text=paste("model2.",i,sep="")))
   model.number2<-eval(parse(text=paste("model3.",i,sep="")))
   model.number3<-eval(parse(text=paste("model4.",i,sep="")))
@@ -4926,10 +4567,8 @@ for(i in c(1,2,9,26)){
   Pop10<-mean(Hepatitis.B.agegroup14$Population.book[
     which(Hepatitis.B.agegroup14$Order==i)])
   Pop<-c(Pop7,Pop8,Pop9,Pop10)
-  Sd<-1/c(prod(diag(s7[[1]])),prod(diag(s8[[1]])),
-          prod(diag(s9[[1]])),prod(diag(s10[[1]])))
-  Prop2.1<-c(Pop[1]*Sd[1]/sum(Pop*Sd),Pop[2]*Sd[2]/sum(Pop*Sd),
-             Pop[3]*Sd[3]/sum(Pop*Sd),Pop[4]*Sd[4]/sum(Pop*Sd))
+  Prop2.1<-c(Pop[1]/sum(Pop),Pop[2]/sum(Pop),
+             Pop[3]/sum(Pop),Pop[4]/sum(Pop))
   model.number1<-eval(parse(text=paste("model7.",i,sep="")))
   model.number2<-eval(parse(text=paste("model8.",i,sep="")))
   model.number3<-eval(parse(text=paste("model9.",i,sep="")))
@@ -4972,8 +4611,8 @@ for(i in c(1,2,9,26)){
   Para.single[i,6]<-sqrt(Prop2.1^2%*%Se3^2)
 }
 
-#Jiangxi, Inner Mongolia, Zhejiang, Anhui, Shandong, Hainan, Yunnan
-for(i in c(5,11,12,14,15,21,25)){
+#Others
+for(i in c(3:8,10:25,27:31)){
   y6<-yori6.2[i,]
   y7<-yori7.2[i,]
   y8<-yori8.2[i,]
@@ -4995,12 +4634,8 @@ for(i in c(5,11,12,14,15,21,25)){
   Pop10<-mean(Hepatitis.B.agegroup14$Population.book[
     which(Hepatitis.B.agegroup14$Order==i)])
   Pop<-c(Pop6,Pop7,Pop8,Pop9,Pop10)
-  Sd<-1/c(prod(diag(s6[[1]])),prod(diag(s7[[1]])),
-          prod(diag(s8[[1]])),prod(diag(s9[[1]])),
-          prod(diag(s10[[1]])))
-  Prop2.2<-c(Pop[1]*Sd[1]/sum(Pop*Sd),Pop[2]*Sd[2]/sum(Pop*Sd),
-             Pop[3]*Sd[3]/sum(Pop*Sd),Pop[4]*Sd[4]/sum(Pop*Sd),
-             Pop[5]*Sd[5]/sum(Pop*Sd))
+  Prop2.2<-c(Pop[1]/sum(Pop),Pop[2]/sum(Pop),Pop[3]/sum(Pop),
+             Pop[4]/sum(Pop),Pop[5]/sum(Pop))
   model.number1<-eval(parse(text=paste("model6.",i,sep="")))
   model.number2<-eval(parse(text=paste("model7.",i,sep="")))
   model.number3<-eval(parse(text=paste("model8.",i,sep="")))
@@ -5052,92 +4687,76 @@ for(i in c(5,11,12,14,15,21,25)){
 
 #Other provinces
 for(i in c(3,4,6:8,10,13,16:20,22:24,27:31)){
-  y5<-yori5.2[i,]
   y6<-yori6.2[i,]
   y7<-yori7.2[i,]
   y8<-yori8.2[i,]
   y9<-yori9[i,]
   y10<-yori10[i,]
-  s5<-Sori5.2[i]
   s6<-Sori6.2[i]
   s7<-Sori7.2[i]
   s8<-Sori8.2[i]
   s9<-Sori9[i]
   s10<-Sori10[i]
-  Pop1<-mean(Hepatitis.B.agegroup9$Population.book[
-    which(Hepatitis.B.agegroup9$Order==i)])
-  Pop2<-mean(Hepatitis.B.agegroup10$Population.book[
+  Pop6<-mean(Hepatitis.B.agegroup10$Population.book[
     which(Hepatitis.B.agegroup10$Order==i)])
-  Pop3<-mean(Hepatitis.B.agegroup11$Population.book[
+  Pop7<-mean(Hepatitis.B.agegroup11$Population.book[
     which(Hepatitis.B.agegroup11$Order==i)])
-  Pop4<-mean(Hepatitis.B.agegroup12$Population.book[
+  Pop8<-mean(Hepatitis.B.agegroup12$Population.book[
     which(Hepatitis.B.agegroup12$Order==i)])
-  Pop5<-mean(Hepatitis.B.agegroup13$Population.book[
+  Pop9<-mean(Hepatitis.B.agegroup13$Population.book[
     which(Hepatitis.B.agegroup13$Order==i)])
-  Pop6<-mean(Hepatitis.B.agegroup14$Population.book[
+  Pop10<-mean(Hepatitis.B.agegroup14$Population.book[
     which(Hepatitis.B.agegroup14$Order==i)])
-  Pop<-c(Pop1,Pop2,Pop3,Pop4,Pop5,Pop6)
-  Sd<-1/c(prod(diag(s5[[1]])),prod(diag(s6[[1]])),prod(diag(s7[[1]])),
-          prod(diag(s8[[1]])),prod(diag(s9[[1]])),prod(diag(s10[[1]])))
-  Prop2.3<-c(Pop[1]*Sd[1]/sum(Pop*Sd),Pop[2]*Sd[2]/sum(Pop*Sd),
-             Pop[3]*Sd[3]/sum(Pop*Sd),Pop[4]*Sd[4]/sum(Pop*Sd),
-             Pop[5]*Sd[5]/sum(Pop*Sd),Pop[6]*Sd[6]/sum(Pop*Sd))
-  model.number1<-eval(parse(text=paste("model5.",i,sep="")))
-  model.number2<-eval(parse(text=paste("model6.",i,sep="")))
-  model.number3<-eval(parse(text=paste("model7.",i,sep="")))
-  model.number4<-eval(parse(text=paste("model8.",i,sep="")))
-  model.number5<-eval(parse(text=paste("model9.",i,sep="")))
-  model.number6<-eval(parse(text=paste("model10.",i,sep="")))
-  yori.specific[i,]<-y5*Prop2.3[1]+y6*Prop2.3[2]+y7*Prop2.3[3]+
-    y8*Prop2.3[4]+y9*Prop2.3[5]+y10*Prop2.3[6]
-  Sori.specific[[i]]<-Prop2.3[1]^2*s5[[1]]+Prop2.3[2]^2*s6[[1]]+
-    s7[[1]]*Prop2.3[3]^2+
-    Prop2.3[4]^2*s8[[1]]+s9[[1]]*Prop2.3[5]^2+
-    Prop2.3[6]^2*s10[[1]]
-  Point1<-matrix(nrow=6,ncol=1,c(model.number1$coefficients[3],
+  Pop<-c(Pop6,Pop7,Pop8,Pop9,Pop10)
+  Prop2.2<-c(Pop[1]/sum(Pop),Pop[2]/sum(Pop),Pop[3]/sum(Pop),
+             Pop[4]/sum(Pop),Pop[5]/sum(Pop))
+  model.number1<-eval(parse(text=paste("model6.",i,sep="")))
+  model.number2<-eval(parse(text=paste("model7.",i,sep="")))
+  model.number3<-eval(parse(text=paste("model8.",i,sep="")))
+  model.number4<-eval(parse(text=paste("model9.",i,sep="")))
+  model.number5<-eval(parse(text=paste("model10.",i,sep="")))
+  yori.specific[i,]<-y6*Prop2.2[1]+y7*Prop2.2[2]+y8*Prop2.2[3]+
+    y9*Prop2.2[4]+y10*Prop2.2[5]
+  Sori.specific[[i]]<-Prop2.2[1]^2*s6[[1]]+s7[[1]]*Prop2.2[2]^2+
+    Prop2.2[3]^2*s8[[1]]+Prop2.2[4]^2*s9[[1]]+s10[[1]]*Prop2.2[5]^2
+  Point1<-matrix(nrow=5,ncol=1,c(model.number1$coefficients[3],
                                  model.number2$coefficients[3],
                                  model.number3$coefficients[3],
-                                 model.number4$coefficients[3],
-                                 model.number5$coefficients[2],
-                                 model.number6$coefficients[2]))
-  Para.single[i,1]<-Prop2.3%*%Point1
-  Se1<-matrix(nrow=6,ncol=1,c(summary(model.number1)$se[3],
+                                 model.number4$coefficients[2],
+                                 model.number5$coefficients[2]))
+  Para.single[i,1]<-Prop2.2%*%Point1
+  Se1<-matrix(nrow=5,ncol=1,c(summary(model.number1)$se[3],
                               summary(model.number2)$se[3],
                               summary(model.number3)$se[3],
-                              summary(model.number4)$se[3],
-                              summary(model.number5)$se[2],
-                              summary(model.number6)$se[2]))
-  Para.single[i,2]<-sqrt(Prop2.3^2%*%Se1^2)
-  Point2<-matrix(nrow=6,ncol=1,c(model.number1$coefficients[4],
+                              summary(model.number4)$se[2],
+                              summary(model.number5)$se[2]))
+  Para.single[i,2]<-sqrt(Prop2.2^2%*%Se1^2)
+  Point2<-matrix(nrow=5,ncol=1,c(model.number1$coefficients[4],
                                  model.number2$coefficients[4],
                                  model.number3$coefficients[4],
-                                 model.number4$coefficients[4],
-                                 model.number5$coefficients[3],
-                                 model.number6$coefficients[3]))
-  Para.single[i,3]<-Prop2.3%*%Point2
-  Se2<-matrix(nrow=6,ncol=1,c(summary(model.number1)$se[4],
+                                 model.number4$coefficients[3],
+                                 model.number5$coefficients[3]))
+  Para.single[i,3]<-Prop2.2%*%Point2
+  Se2<-matrix(nrow=5,ncol=1,c(summary(model.number1)$se[4],
                               summary(model.number2)$se[4],
                               summary(model.number3)$se[4],
-                              summary(model.number4)$se[4],
-                              summary(model.number5)$se[3],
-                              summary(model.number6)$se[3]))
-  Para.single[i,4]<-sqrt(Prop2.3^2%*%Se2^2)
+                              summary(model.number4)$se[3],
+                              summary(model.number5)$se[3]))
+  Para.single[i,4]<-sqrt(Prop2.2^2%*%Se2^2)
   length.coef1<-length(model.number1$coefficients)
-  length.coef2<-length(model.number5$coefficients)
-  Point3<-matrix(nrow=6,ncol=1,c(model.number1$coefficients[length.coef1],
+  length.coef2<-length(model.number4$coefficients)
+  Point3<-matrix(nrow=5,ncol=1,c(model.number1$coefficients[length.coef1],
                                  model.number2$coefficients[length.coef1],
                                  model.number3$coefficients[length.coef1],
-                                 model.number4$coefficients[length.coef1],
-                                 model.number5$coefficients[length.coef2],
-                                 model.number6$coefficients[length.coef2]))
-  Para.single[i,5]<-Prop2.3%*%Point3
-  Se3<-matrix(nrow=6,ncol=1,c(summary(model.number1)$se[length.coef1],
+                                 model.number4$coefficients[length.coef2],
+                                 model.number5$coefficients[length.coef2]))
+  Para.single[i,5]<-Prop2.2%*%Point3
+  Se3<-matrix(nrow=5,ncol=1,c(summary(model.number1)$se[length.coef1],
                               summary(model.number2)$se[length.coef1],
                               summary(model.number3)$se[length.coef1],
-                              summary(model.number4)$se[length.coef1],
-                              summary(model.number5)$se[length.coef2],
-                              summary(model.number6)$se[length.coef2]))
-  Para.single[i,6]<-sqrt(Prop2.3^2%*%Se3^2)
+                              summary(model.number4)$se[length.coef2],
+                              summary(model.number5)$se[length.coef2]))
+  Para.single[i,6]<-sqrt(Prop2.2^2%*%Se3^2)
 }
 Para<-as.data.frame(matrix(ncol=4,nrow=31,0))
 Para$V1<-paste0(sprintf("%0.3f",Para.single$V1)," (",
@@ -5253,7 +4872,7 @@ for(i in c(1,2,9,26)){
   EC.specific[i,6]<-sort(EC.specific.2009.1)[n.cir*0.975]
 }
 
-for(i in c(5,11,12,14,15,21,25)){
+for(i in c(3:8,10:25,27:31)){
   EIR.specific.6.2<-EIR.specific.2009(c(i),Hepatitis.B.agegroup10,"model6",c(3,11),(2+12)/12,10000)
   EIR.specific.7.2<-EIR.specific.2009(c(i),Hepatitis.B.agegroup11,"model7",c(3,11),(2+2*12)/12,10000)
   EIR.specific.8.2<-EIR.specific.2009(c(i),Hepatitis.B.agegroup12,"model8",c(3,11),(2+7*12)/12,10000)
@@ -5275,35 +4894,6 @@ for(i in c(5,11,12,14,15,21,25)){
     EIR.specific.9$Point.EC[1]+EIR.specific.10$Point.EC[1]
   EC.specific[i,5]<-sort(EC.specific.2009.2)[n.cir*0.025]
   EC.specific[i,6]<-sort(EC.specific.2009.2)[n.cir*0.975]
-}
-
-for(i in c(3,4,6:8,10,13,16:20,22:24,27:31)){
-  EIR.specific.5.2<-EIR.specific.2009(c(i),Hepatitis.B.agegroup9,"model5",c(3,11),2/12,10000)
-  EIR.specific.6.2<-EIR.specific.2009(c(i),Hepatitis.B.agegroup10,"model6",c(3,11),(2+12)/12,10000)
-  EIR.specific.7.2<-EIR.specific.2009(c(i),Hepatitis.B.agegroup11,"model7",c(3,11),(2+2*12)/12,10000)
-  EIR.specific.8.2<-EIR.specific.2009(c(i),Hepatitis.B.agegroup12,"model8",c(3,11),(2+7*12)/12,10000)
-  EIR.specific.9<-EIR.specific.2009(c(i),Hepatitis.B.agegroup13,"model9",c(2,9),6,10000)
-  EIR.specific.10<-EIR.specific.2009(c(i),Hepatitis.B.agegroup14,"model10",c(2,9),1,10000)
-  EIR.specific.2009.3<-Prop2.3[1]*EIR.specific.5.2$EIR+
-    Prop2.3[2]*EIR.specific.6.2$EIR+Prop2.3[3]*EIR.specific.7.2$EIR+
-    Prop2.3[4]*EIR.specific.8.2$EIR+Prop2.3[5]*EIR.specific.9$EIR+
-    Prop2.3[6]*EIR.specific.10$EIR
-  EIR.specific[i,4]<-Prop2.3[1]*EIR.specific.5.2$Point.EIR[1]+
-    Prop2.3[2]*EIR.specific.6.2$Point.EIR[1]+Prop2.3[3]*EIR.specific.7.2$Point.EIR[1]+
-    Prop2.3[4]*EIR.specific.8.2$Point.EIR[1]+Prop2.3[5]*EIR.specific.9$Point.EIR[1]+
-    Prop2.3[6]*EIR.specific.10$Point.EIR[1]
-  EIR.specific[i,5]<-sort(EIR.specific.2009.3)[n.cir*0.025]
-  EIR.specific[i,6]<-sort(EIR.specific.2009.3)[n.cir*0.975]
-  EC.specific.2009.3<-EIR.specific.5.2$EC+
-    EIR.specific.6.2$EC+EIR.specific.7.2$EC+
-    EIR.specific.8.2$EC+EIR.specific.9$EC+
-    EIR.specific.10$EC
-  EC.specific[i,4]<-EIR.specific.5.2$Point.EC[1]+
-    EIR.specific.6.2$Point.EC[1]+EIR.specific.7.2$Point.EC[1]+
-    EIR.specific.8.2$Point.EC[1]+EIR.specific.9$Point.EC[1]+
-    EIR.specific.10$Point.EC[1]
-  EC.specific[i,5]<-sort(EC.specific.2009.3)[n.cir*0.025]
-  EC.specific[i,6]<-sort(EC.specific.2009.3)[n.cir*0.975]
 }
 colnames(EIR.specific)<-c("Point.2002","Low.2002","High.2002",
                           "Point.2009","Low.2009","High.2009")
@@ -5335,9 +4925,7 @@ Sori2<-vector("list", length(datalist)); names(Sori2) <- regionsfor(i in c(1:31)
 {sub.data<-Hepatitis.B.agegroup6[which(Hepatitis.B.agegroup6$Order==i),]
 mfirst<-gam(Case~ offset(log(Population.book))+Intervention.2002+Time+
               ns(Temperature,df=3)+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
-              Holiday+Interaction.2002,#+Holiday+GDP+Birth_Rate
+              Holiday+Interaction.2002,
             family=quasipoisson(link='log'), data=sub.data)
 lengthfun<-length(summary(mfirst)$p.coeff)
 yori2[i,c(1:2)] <- as.data.frame(summary(mfirst)$p.coeff)[c(2,lengthfun),1]
@@ -5363,9 +4951,7 @@ for(i in c(1:31))
 {sub.data<-Hepatitis.B.agegroup7[which(Hepatitis.B.agegroup7$Order==i),]
 mfirst<-gam(Case~ offset(log(Population.book))+Intervention.2002+Time+
               ns(Temperature,df=3)+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
-              Holiday+Interaction.2002,#+Holiday+GDP+Birth_Rate
+              Holiday+Interaction.2002,
             family=quasipoisson(link='log'), data=sub.data)
 lengthfun<-length(summary(mfirst)$p.coeff)
 yori3[i,c(1:2)] <- as.data.frame(summary(mfirst)$p.coeff)[c(2,lengthfun),1]
@@ -5391,9 +4977,7 @@ for(i in c(1:31))
 {sub.data<-Hepatitis.B.agegroup8[which(Hepatitis.B.agegroup8$Order==i),]
 mfirst<-gam(Case~ offset(log(Population.book))+Intervention.2002+Time+
               ns(Temperature,df=3)+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
-              Holiday+Interaction.2002,#+Holiday+GDP+Birth_Rate
+              Holiday+Interaction.2002,
             family=quasipoisson(link='log'), data=sub.data)
 lengthfun<-length(summary(mfirst)$p.coeff)
 yori4[i,c(1:2)] <- as.data.frame(summary(mfirst)$p.coeff)[c(2,lengthfun),1]
@@ -5422,9 +5006,7 @@ for(i in c(1:31))
 {sub.data<-Hepatitis.B.agegroup9[which(Hepatitis.B.agegroup9$Order==i),]
 mfirst<-gam(Case~ offset(log(Population.book))+Intervention.2002+#Intervention.2009+
               Time+ns(Temperature,df=3)+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
-              Holiday+Interaction.2002,#+Holiday+GDP+Birth_Rate+Interaction.2009
+              Holiday+Interaction.2002+Interaction.2009,
             family=quasipoisson(link='log'), data=sub.data)
 lengthfun<-length(summary(mfirst)$p.coeff)
 yori5.1[i,c(1:2)] <- as.data.frame(summary(mfirst)$p.coeff)[c(2,lengthfun-1),1]
@@ -5454,9 +5036,7 @@ for(i in c(1:31))
 {sub.data<-Hepatitis.B.agegroup10[which(Hepatitis.B.agegroup10$Order==i),]
 mfirst<-gam(Case~ offset(log(Population.book))+Intervention.2002+Intervention.2009+
               Time+ns(Temperature,df=3)+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
-              Holiday+Interaction.2002+Interaction.2009,#+Holiday+GDP+Birth_Rate
+              Holiday+Interaction.2002+Interaction.2009,
             family=quasipoisson(link='log'), data=sub.data)
 lengthfun<-length(summary(mfirst)$p.coeff)
 yori6.1[i,c(1:2)] <- as.data.frame(summary(mfirst)$p.coeff)[c(2,lengthfun-1),1]
@@ -5490,9 +5070,7 @@ for(i in c(1:31))
 {sub.data<-Hepatitis.B.agegroup11[which(Hepatitis.B.agegroup11$Order==i),]
 mfirst<-gam(Case~ offset(log(Population.book))+Intervention.2002+Intervention.2009+
               Time+ns(Temperature,df=3)+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
-              Holiday+Interaction.2002+Interaction.2009,#+Holiday+GDP+Birth_Rate
+              Holiday+Interaction.2002+Interaction.2009,
             family=quasipoisson(link='log'), data=sub.data)
 lengthfun<-length(summary(mfirst)$p.coeff)
 yori7.1[i,c(1:2)] <- as.data.frame(summary(mfirst)$p.coeff)[c(2,lengthfun-1),1]
@@ -5526,9 +5104,7 @@ for(i in c(1:31))
 {sub.data<-Hepatitis.B.agegroup12[which(Hepatitis.B.agegroup12$Order==i),]
 mfirst<-gam(Case~ offset(log(Population.book))+Intervention.2002+Intervention.2009+
               Time+ns(Temperature,df=3)+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
-              Holiday+Interaction.2002+Interaction.2009,#+Holiday+GDP+Birth_Rate
+              Holiday+Interaction.2002+Interaction.2009,
             family=quasipoisson(link='log'), data=sub.data)
 lengthfun<-length(summary(mfirst)$p.coeff)
 yori8.1[i,c(1:2)] <- as.data.frame(summary(mfirst)$p.coeff)[c(2,lengthfun-1),1]
@@ -5576,13 +5152,9 @@ Age.pop6<-mean(aggregate(Population.book~Time,
 Age.pop7<-mean(aggregate(Population.book~Time,data=Hepatitis.B.agegroup11,FUN=sum)[,2])
 Age.pop8<-mean(aggregate(Population.book~Time,data=Hepatitis.B.agegroup12,FUN=sum)[,2])
 Age.pop<-c(Age.pop2,Age.pop3,Age.pop4,Age.pop5,Age.pop6,Age.pop7,Age.pop8)
-Sd<-1/c(prod(diag(mvall2$vcov)),
-        prod(diag(mvall3$vcov)),prod(diag(mvall4$vcov)),
-        prod(diag(mvall5.1$vcov)),prod(diag(mvall6.1$vcov)),
-        prod(diag(mvall7.1$vcov)),prod(diag(mvall8.1$vcov)))
-Prop.pop<-c(Age.pop2*Sd[1]/sum(Age.pop*Sd),Age.pop3*Sd[2]/sum(Age.pop*Sd),Age.pop4*Sd[3]/sum(Age.pop*Sd),
-            Age.pop5*Sd[4]/sum(Age.pop*Sd),Age.pop6*Sd[5]/sum(Age.pop*Sd),Age.pop7*Sd[6]/sum(Age.pop*Sd),
-            Age.pop8*Sd[7]/sum(Age.pop*Sd))
+Prop.pop<-c(Age.pop2/sum(Age.pop),Age.pop3/sum(Age.pop),Age.pop4/sum(Age.pop),
+            Age.pop5/sum(Age.pop),Age.pop6/sum(Age.pop),Age.pop7/sum(Age.pop),
+            Age.pop8/sum(Age.pop))
 Merge.coef<-Prop.pop[1]*mvall2$coefficients+Prop.pop[2]*mvall3$coefficients+
   Prop.pop[3]*mvall4$coefficients+Prop.pop[4]*mvall5.1$coefficients+
   Prop.pop[5]*mvall6.1$coefficients+Prop.pop[6]*mvall7.1$coefficients+
@@ -5633,9 +5205,7 @@ for(i in c(1:31))
 {sub.data<-Hepatitis.B.agegroup13[which(Hepatitis.B.agegroup13$Order==i),]
 mfirst<-gam(Case~ offset(log(Population.book))+Intervention.2009+Time+
               ns(Temperature,df=3)+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
-              Holiday+Interaction.2009,#+Holiday+GDP+Birth_Rate
+              Holiday+Interaction.2009,
             family=quasipoisson(link='log'), data=sub.data)
 lengthfun<-length(summary(mfirst)$p.coeff)
 yori9[i,c(1:2)] <- as.data.frame(summary(mfirst)$p.coeff)[c(2,lengthfun),1]
@@ -5661,9 +5231,7 @@ for(i in c(1:31))
 {sub.data<-Hepatitis.B.agegroup14[which(Hepatitis.B.agegroup14$Order==i),]
 mfirst<-gam(Case~ offset(log(Population.book))+Intervention.2009+Time+
               ns(Temperature,df=3)+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
-              Holiday+Interaction.2009,#+Holiday+GDP+Birth_Rate
+              Holiday+Interaction.2009,
             family=quasipoisson(link='log'), data=sub.data)
 lengthfun<-length(summary(mfirst)$p.coeff)
 yori10[i,c(1:2)] <- as.data.frame(summary(mfirst)$p.coeff)[c(2,lengthfun),1]
@@ -5682,13 +5250,8 @@ Age.pop6<-mean(aggregate(Population.book~Time,
 Age.pop9<-mean(aggregate(Population.book~Time,data=Hepatitis.B.agegroup13,FUN=sum)[,2])
 Age.pop10<-mean(aggregate(Population.book~Time,data=Hepatitis.B.agegroup14,FUN=sum)[,2])
 Age.pop.2009<-c(Age.pop6,Age.pop7,Age.pop8,Age.pop9,Age.pop10)
-#Prop.pop.2009<-c(Age.pop6/sum(Age.pop.2009),Age.pop7/sum(Age.pop.2009),
-#                 Age.pop8/sum(Age.pop.2009),Age.pop9/sum(Age.pop.2009),Age.pop10/sum(Age.pop.2009))
-Sd<-1/c(prod(diag(mvall6.2$vcov)),
-        prod(diag(mvall7.2$vcov)),prod(diag(mvall8.2$vcov)),
-        prod(diag(mvall9$vcov)),prod(diag(mvall10$vcov)))
-Prop.pop.2009<-c(Age.pop6*Sd[1]/sum(Age.pop.2009*Sd),Age.pop7*Sd[2]/sum(Age.pop.2009*Sd),Age.pop8*Sd[3]/sum(Age.pop.2009*Sd),
-                 Age.pop9*Sd[4]/sum(Age.pop.2009*Sd),Age.pop10*Sd[5]/sum(Age.pop.2009*Sd))
+Prop.pop.2009<-c(Age.pop6/sum(Age.pop.2009),Age.pop7/sum(Age.pop.2009),
+                 Age.pop8/sum(Age.pop.2009),Age.pop9/sum(Age.pop.2009),Age.pop10/sum(Age.pop.2009))
 Merge.coef.2009<-Prop.pop.2009[1]*mvall6.2$coefficients+
   Prop.pop.2009[2]*mvall7.2$coefficients+Prop.pop.2009[3]*mvall8.2$coefficients+
   Prop.pop.2009[4]*mvall9$coefficients+Prop.pop.2009[5]*mvall10$coefficients
@@ -5721,375 +5284,12 @@ ER$ER<-sprintf("%0.2f",ER$ER)
 ER$ER.lower<-sprintf("%0.2f",ER$ER.lower)
 ER$ER.upper<-sprintf("%0.2f",ER$ER.upper)
 
-#######################The updated diagnostic criteria########################
-#Age group 6
-Hepatitis.B.agegroup6<-read.xlsx("agegroup6.xlsx")
-Hepatitis.B.agegroup6$Month.factor<-factor(Hepatitis.B.agegroup6$Month)
-Hepatitis.B.agegroup6$Time<-rep(c(0:179),31)
-Hepatitis.B.agegroup6$Holiday<-factor(rep(rep(c(1,1,0,0,0,0,2,2,0,0,0,0),15),31))
-Hepatitis.B.agegroup6$Intervention.2002<-factor(rep(c(rep(0,12*2),rep(1,13*12)),31))
-Hepatitis.B.agegroup6$Interaction.2002<-rep(c(rep(0,2*12),c(0:(180-2*12-1))),31)
-Hepatitis.B.agegroup6$Criteria<-rep(c(rep(0,4*12+5),rep(1,180-4*12-5)),31)
-regions<-as.character(unique(Hepatitis.B.agegroup6$Province))
-datalist<-lapply(regions, function(x) Hepatitis.B.agegroup6[Hepatitis.B.agegroup6$Province==x, ])
-seq(datalist)
-yori2<-matrix(0, length(datalist), 2, dimnames=list(regions, paste("beta", seq(2,3), sep="")))
-Sori2<-vector("list", length(datalist)); names(Sori2) <- regions
-y.criteria<-matrix(0, length(datalist), 1, dimnames=list(regions, "beta"))
-S.criteria<-Sori2
-for(i in c(1:31))
-{sub.data<-Hepatitis.B.agegroup6[which(Hepatitis.B.agegroup6$Order==i),]
-mfirst<-gam(Case~ offset(log(Population.book))+Intervention.2002+Interaction.2002+
-              Time+ns(Temperature,df=3)+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
-              Holiday+Criteria+Criteria:Intervention.2002,#+Holiday+GDP+Birth_Rate
-            family=quasipoisson(link='log'), data=sub.data)
-lengthfun<-length(summary(mfirst)$p.coeff)
-yori2[i,c(1:2)] <- as.data.frame(summary(mfirst)$p.coeff)[c(2,3),1]
-Sori2[[i]] <- vcov(mfirst)[c(2,3),c(2,3)]
-y.criteria[i]<-as.data.frame(summary(mfirst)$p.coeff)[c(lengthfun),1]
-S.criteria[[i]]<-vcov(mfirst)[c(lengthfun),c(lengthfun)]
-assign(paste("model2.",i,sep=""),mfirst)
-}
-#Too many NaNs indicate the interaction of criteria and intervention is unnecessary
-Criteria2<-mvmeta(y.criteria[-c(1,2,6,9,26),]~1, S.criteria[-c(1,2,6,9,26)], method="reml")
-summary(Criteria2)
-
-#Age group 7
-Hepatitis.B.agegroup7<-read.xlsx("agegroup7.xlsx")
-Hepatitis.B.agegroup7$Month.factor<-factor(Hepatitis.B.agegroup7$Month)
-Hepatitis.B.agegroup7$Time<-rep(c(0:179),31)
-Hepatitis.B.agegroup7$Holiday<-factor(rep(rep(c(1,1,0,0,0,0,2,2,0,0,0,0),15),31))
-Hepatitis.B.agegroup7$Intervention.2002<-factor(rep(c(rep(0,12*3),rep(1,12*12)),31))
-Hepatitis.B.agegroup7$Interaction.2002<-rep(c(rep(0,3*12),c(0:(180-3*12-1))),31)
-Hepatitis.B.agegroup7$Criteria<-rep(c(rep(0,4*12+5),rep(1,180-4*12-5)),31)
-regions<-as.character(unique(Hepatitis.B.agegroup7$Province))
-datalist<-lapply(regions, function(x) Hepatitis.B.agegroup7[Hepatitis.B.agegroup7$Province==x, ])
-seq(datalist)
-yori3<-matrix(0, length(datalist), 2, dimnames=list(regions, paste("beta", seq(2,3), sep="")))
-Sori3<-vector("list", length(datalist)); names(Sori3) <- regions
-y.criteria<-matrix(0, length(datalist), 1, dimnames=list(regions, "beta"))
-S.criteria<-Sori2
-for(i in c(1:31))
-{sub.data<-Hepatitis.B.agegroup7[which(Hepatitis.B.agegroup7$Order==i),]
-mfirst<-gam(Case~ offset(log(Population.book))+Intervention.2002+Interaction.2002+
-              Time+ns(Temperature,df=3)+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
-              Holiday+Criteria+Criteria:Intervention.2002,#+Holiday+GDP+Birth_Rate
-            family=quasipoisson(link='log'), data=sub.data)
-lengthfun<-length(summary(mfirst)$p.coeff)
-yori3[i,c(1:2)] <- as.data.frame(summary(mfirst)$p.coeff)[c(2,3),1]
-Sori3[[i]] <- vcov(mfirst)[c(2,3),c(2,3)]
-y.criteria[i]<-as.data.frame(summary(mfirst)$p.coeff)[c(lengthfun),1]
-S.criteria[[i]]<-vcov(mfirst)[c(lengthfun),c(lengthfun)]
-assign(paste("model3.",i,sep=""),mfirst)
-}
-Criteria3<-mvmeta(y.criteria[-c(1,2,9,14,26),]~1, S.criteria[-c(1,2,9,14,26)], method="reml")
-summary(Criteria3)
-
-#Age group 8
-Hepatitis.B.agegroup8<-read.xlsx("agegroup8.xlsx")
-Hepatitis.B.agegroup8$Month.factor<-factor(Hepatitis.B.agegroup8$Month)
-Hepatitis.B.agegroup8$Time<-rep(c(0:179),31)
-Hepatitis.B.agegroup8$Holiday<-factor(rep(rep(c(1,1,0,0,0,0,2,2,0,0,0,0),15),31))
-Hepatitis.B.agegroup8$Intervention.2002<-factor(rep(c(rep(0,12*4),rep(1,12*11)),31))
-Hepatitis.B.agegroup8$Interaction.2002<-rep(c(rep(0,4*12),c(0:(180-4*12-1))),31)
-Hepatitis.B.agegroup8$Criteria<-rep(c(rep(0,4*12+5),rep(1,180-4*12-5)),31)
-regions<-as.character(unique(Hepatitis.B.agegroup8$Province))
-datalist<-lapply(regions, function(x) Hepatitis.B.agegroup8[Hepatitis.B.agegroup8$Province==x, ])
-seq(datalist)
-yori4<-matrix(0, length(datalist), 2, dimnames=list(regions, paste("beta", seq(2,3), sep="")))
-Sori4<-vector("list", length(datalist)); names(Sori4) <- regions
-y.criteria<-matrix(0, length(datalist), 1, dimnames=list(regions, "beta"))
-S.criteria<-Sori2
-for(i in c(1:31))
-{sub.data<-Hepatitis.B.agegroup8[which(Hepatitis.B.agegroup8$Order==i),]
-mfirst<-gam(Case~ offset(log(Population.book))+Intervention.2002+Interaction.2002+
-              Time+ns(Temperature,df=3)+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
-              Holiday+Criteria+Criteria:Intervention.2002,#+Holiday+GDP+Birth_Rate
-            family=quasipoisson(link='log'), data=sub.data)
-lengthfun<-length(summary(mfirst)$p.coeff)
-yori4[i,c(1:2)] <- as.data.frame(summary(mfirst)$p.coeff)[c(2,3),1]
-Sori4[[i]] <- vcov(mfirst)[c(2,3),c(2,3)]
-y.criteria[i]<-as.data.frame(summary(mfirst)$p.coeff)[c(lengthfun),1]
-S.criteria[[i]]<-vcov(mfirst)[c(lengthfun),c(lengthfun)]
-assign(paste("model4.",i,sep=""),mfirst)
-}
-which(y.criteria!=0)
-Criteria4<-mvmeta(y.criteria[-c(1,2,9,14,26),]~1, S.criteria[-c(1,2,9,14,26)], method="reml")
-summary(Criteria4)
-
-#Age group 9
-Hepatitis.B.agegroup9<-read.xlsx("agegroup9.xlsx")
-Hepatitis.B.agegroup9$Month.factor<-factor(Hepatitis.B.agegroup9$Month)
-Hepatitis.B.agegroup9$Time<-rep(c(0:179),31)
-Hepatitis.B.agegroup9$Holiday<-factor(rep(rep(c(1,1,0,0,0,0,2,2,0,0,0,0),15),31))
-Hepatitis.B.agegroup9$Intervention.2002<-factor(rep(c(rep(0,12*5),rep(1,12*10)),31))
-Hepatitis.B.agegroup9$Intervention.2009<-factor(rep(c(rep(0,12*4),rep(0,10),rep(1,2),rep(0,12*10)),31))
-Hepatitis.B.agegroup9$Interaction.2002<-rep(c(rep(0,5*12),c(0:(180-5*12-1))),31)
-Hepatitis.B.agegroup9$Interaction.2009<-rep(c(rep(0,4*12),rep(0,10),c(0:(2-1)),rep(0,10*12)),31)
-Hepatitis.B.agegroup9$Criteria<-rep(c(rep(0,4*12+5),rep(1,180-4*12-5)),31)
-regions<-as.character(unique(Hepatitis.B.agegroup9$Province))
-datalist<-lapply(regions, function(x) Hepatitis.B.agegroup9[Hepatitis.B.agegroup9$Province==x, ])
-seq(datalist)
-yori5.1<-matrix(0, length(datalist), 2, dimnames=list(regions, paste("beta", seq(2,3), sep="")))
-Sori5.1<-vector("list", length(datalist)); names(Sori5.1) <- regions
-yori5.2<-matrix(0, length(datalist), 2, dimnames=list(regions, paste("beta", seq(2,3), sep="")))
-Sori5.2<-vector("list", length(datalist)); names(Sori5.2) <- regions
-y.criteria1<-matrix(0, length(datalist), 1, dimnames=list(regions, "beta"))
-S.criteria1<-Sori2
-y.criteria2<-matrix(0, length(datalist), 1, dimnames=list(regions, "beta"))
-S.criteria2<-Sori2
-for(i in c(1:31))
-{sub.data<-Hepatitis.B.agegroup9[which(Hepatitis.B.agegroup9$Order==i),]
-mfirst<-gam(Case~ offset(log(Population.book))+Intervention.2002+Interaction.2002+
-              Intervention.2009+Interaction.2009+
-              Time+ns(Temperature,df=3)+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
-              Holiday+Criteria+Criteria:Intervention.2002+Criteria:Intervention.2009,#+Holiday+GDP+Birth_Rate+Interaction.2009
-            family=quasipoisson(link='log'), data=sub.data)
-lengthfun<-length(summary(mfirst)$p.coeff)
-yori5.1[i,c(1:2)] <- as.data.frame(summary(mfirst)$p.coeff)[c(2,3),1]
-Sori5.1[[i]] <- vcov(mfirst)[c(2,3),c(2,3)]
-yori5.2[i,c(1:2)] <- as.data.frame(summary(mfirst)$p.coeff)[c(4,5),1]
-Sori5.2[[i]] <- vcov(mfirst)[c(4,5),c(4,5)]
-y.criteria1[i]<-as.data.frame(summary(mfirst)$p.coeff)[c(lengthfun-1),1]
-S.criteria1[[i]]<-vcov(mfirst)[c(lengthfun-1),c(lengthfun-1)]
-y.criteria2[i]<-as.data.frame(summary(mfirst)$p.coeff)[c(lengthfun),1]
-S.criteria2[[i]]<-vcov(mfirst)[c(lengthfun),c(lengthfun)]
-assign(paste("model5.",i,sep=""),mfirst)
-}
-which(y.criteria1!=0)
-Criteria5.1<-mvmeta(y.criteria1[-c(1,2,9,14,26),]~1, S.criteria1[-c(1,2,9,14,26)], method="reml")
-summary(Criteria5.1)
-which(y.criteria2!=0)
-Criteria5.2<-mvmeta(y.criteria2[-c(1,2,9,14,26),]~1, S.criteria2[-c(1,2,9,14,26)], method="reml")
-summary(Criteria5.2)
-
-#Age group 10
-Hepatitis.B.agegroup10<-read.xlsx("agegroup10.xlsx")
-Hepatitis.B.agegroup10$Month.factor<-factor(Hepatitis.B.agegroup10$Month)
-Hepatitis.B.agegroup10$Time<-rep(c(0:179),31)
-Hepatitis.B.agegroup10$Holiday<-factor(rep(rep(c(1,1,0,0,0,0,2,2,0,0,0,0),15),31))
-Hepatitis.B.agegroup10$Intervention.2002<-factor(rep(c(rep(0,12*6),rep(1,12*9)),31))
-#Hepatitis.B.agegroup10$Intervention.2009<-factor(rep(c(rep(0,12*4),rep(1,12*2),rep(0,12*9)),31))
-Hepatitis.B.agegroup10$Intervention.2009<-factor(rep(c(rep(0,12*4),rep(0,10),rep(1,2+12),rep(0,12*9)),31))
-Hepatitis.B.agegroup10$Interaction.2002<-rep(c(rep(0,6*12),c(0:(180-6*12-1))),31)
-#Hepatitis.B.agegroup10$Interaction.2009<-rep(c(rep(0,4*12),c(0:(2*12-1)),rep(0,9*12)),31)
-Hepatitis.B.agegroup10$Interaction.2009<-rep(c(rep(0,4*12),rep(0,10),c(0:(2+12-1)),rep(0,9*12)),31)
-Hepatitis.B.agegroup10$Criteria<-rep(c(rep(0,4*12+5),rep(1,180-4*12-5)),31)
-regions<-as.character(unique(Hepatitis.B.agegroup10$Province))
-datalist<-lapply(regions, function(x) Hepatitis.B.agegroup10[Hepatitis.B.agegroup10$Province==x, ])
-seq(datalist)
-yori6.1<-matrix(0, length(datalist), 2, dimnames=list(regions, paste("beta", seq(2,3), sep="")))
-Sori6.1<-vector("list", length(datalist)); names(Sori6.1) <- regions
-yori6.2<-matrix(0, length(datalist), 2, dimnames=list(regions, paste("beta", seq(2,3), sep="")))
-Sori6.2<-vector("list", length(datalist)); names(Sori6.2) <- regions
-y.criteria1<-matrix(0, length(datalist), 1, dimnames=list(regions, "beta"))
-S.criteria1<-Sori2
-y.criteria2<-matrix(0, length(datalist), 1, dimnames=list(regions, "beta"))
-S.criteria2<-Sori2
-for(i in c(1:31))
-{sub.data<-Hepatitis.B.agegroup10[which(Hepatitis.B.agegroup10$Order==i),]
-mfirst<-gam(Case~ offset(log(Population.book))+Intervention.2002+Interaction.2002+
-              Intervention.2009+Interaction.2009+
-              Time+ns(Temperature,df=3)+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
-              Holiday+Criteria+Criteria:Intervention.2002+Criteria:Intervention.2009,#+Holiday+GDP+Birth_Rate
-            family=quasipoisson(link='log'), data=sub.data)
-lengthfun<-length(summary(mfirst)$p.coeff)
-yori6.1[i,c(1:2)] <- as.data.frame(summary(mfirst)$p.coeff)[c(2,3),1]
-Sori6.1[[i]] <- vcov(mfirst)[c(2,3),c(2,3)]
-yori6.2[i,c(1:2)] <- as.data.frame(summary(mfirst)$p.coeff)[c(4,5),1]
-Sori6.2[[i]] <- vcov(mfirst)[c(4,5),c(4,5)]
-y.criteria1[i]<-as.data.frame(summary(mfirst)$p.coeff)[c(lengthfun-1),1]
-S.criteria1[[i]]<-vcov(mfirst)[c(lengthfun-1),c(lengthfun-1)]
-y.criteria2[i]<-as.data.frame(summary(mfirst)$p.coeff)[c(lengthfun),1]
-S.criteria2[[i]]<-vcov(mfirst)[c(lengthfun),c(lengthfun)]
-assign(paste("model6.",i,sep=""),mfirst)
-}
-which(y.criteria1!=0)
-Criteria6.1<-mvmeta(y.criteria1[-c(1,2,9,14,26),]~1, S.criteria1[-c(1,2,9,14,26)], method="reml")
-summary(Criteria6.1)
-which(y.criteria2!=0)
-Criteria6.2<-mvmeta(y.criteria2[-c(1,2,9,14,26),]~1, S.criteria2[-c(1,2,9,14,26)], method="reml")
-summary(Criteria6.2)
-
-#Age group 11
-Hepatitis.B.agegroup11<-read.xlsx("agegroup11.xlsx")
-Hepatitis.B.agegroup11$Month.factor<-factor(Hepatitis.B.agegroup11$Month)
-Hepatitis.B.agegroup11$Time<-rep(c(0:179),31)
-Hepatitis.B.agegroup11$Holiday<-factor(rep(rep(c(1,1,0,0,0,0,2,2,0,0,0,0),15),31))
-Hepatitis.B.agegroup11$Intervention.2002<-factor(rep(c(rep(0,12*7),rep(1,12*8)),31))
-Hepatitis.B.agegroup11$Intervention.2009<-factor(rep(c(rep(0,12*4),rep(0,10),rep(1,2+2*12),rep(0,12*8)),31))
-Hepatitis.B.agegroup11$Interaction.2002<-rep(c(rep(0,7*12),c(0:(180-7*12-1))),31)
-Hepatitis.B.agegroup11$Interaction.2009<-rep(c(rep(0,4*12),rep(0,10),c(0:(2+2*12-1)),rep(0,8*12)),31)
-Hepatitis.B.agegroup11$Criteria<-rep(c(rep(0,4*12+5),rep(1,180-4*12-5)),31)
-regions<-as.character(unique(Hepatitis.B.agegroup11$Province))
-datalist<-lapply(regions, function(x) Hepatitis.B.agegroup11[Hepatitis.B.agegroup11$Province==x, ])
-seq(datalist)
-yori7.1<-matrix(0, length(datalist), 2, dimnames=list(regions, paste("beta", seq(2,3), sep="")))
-Sori7.1<-vector("list", length(datalist)); names(Sori7.1) <- regions
-yori7.2<-matrix(0, length(datalist), 2, dimnames=list(regions, paste("beta", seq(2,3), sep="")))
-Sori7.2<-vector("list", length(datalist)); names(Sori7.2) <- regions
-y.criteria1<-matrix(0, length(datalist), 1, dimnames=list(regions, "beta"))
-S.criteria1<-Sori2
-y.criteria2<-matrix(0, length(datalist), 1, dimnames=list(regions, "beta"))
-S.criteria2<-Sori2
-for(i in c(1:31))
-{sub.data<-Hepatitis.B.agegroup11[which(Hepatitis.B.agegroup11$Order==i),]
-mfirst<-gam(Case~ offset(log(Population.book))+Intervention.2002+Interaction.2002+
-              Intervention.2009+Interaction.2009+
-              Time+ns(Temperature,df=3)+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
-              Holiday+Criteria+Criteria:Intervention.2002+Criteria:Intervention.2009,#+Holiday+GDP+Birth_Rate
-            family=quasipoisson(link='log'), data=sub.data)
-lengthfun<-length(summary(mfirst)$p.coeff)
-yori7.1[i,c(1:2)] <- as.data.frame(summary(mfirst)$p.coeff)[c(2,3),1]
-Sori7.1[[i]] <- vcov(mfirst)[c(2,3),c(2,3)]
-yori7.2[i,c(1:2)] <- as.data.frame(summary(mfirst)$p.coeff)[c(4,5),1]
-Sori7.2[[i]] <- vcov(mfirst)[c(4,5),c(4,5)]
-y.criteria1[i]<-as.data.frame(summary(mfirst)$p.coeff)[c(lengthfun-1),1]
-S.criteria1[[i]]<-vcov(mfirst)[c(lengthfun-1),c(lengthfun-1)]
-y.criteria2[i]<-as.data.frame(summary(mfirst)$p.coeff)[c(lengthfun),1]
-S.criteria2[[i]]<-vcov(mfirst)[c(lengthfun),c(lengthfun)]
-assign(paste("model7.",i,sep=""),mfirst)
-}
-which(y.criteria1!=0)
-Criteria7.1<-mvmeta(y.criteria1~1, S.criteria1, method="reml")
-summary(Criteria7.1)
-which(y.criteria2!=0)
-Criteria7.2<-mvmeta(y.criteria2~1, S.criteria2, method="reml")
-summary(Criteria7.2)
-
-#Age group 12
-Hepatitis.B.agegroup12<-read.xlsx("agegroup12.xlsx")
-Hepatitis.B.agegroup12$Month.factor<-factor(Hepatitis.B.agegroup12$Month)
-Hepatitis.B.agegroup12$Time<-rep(c(0:179),31)
-Hepatitis.B.agegroup12$Holiday<-factor(rep(rep(c(1,1,0,0,0,0,2,2,0,0,0,0),15),31))
-Hepatitis.B.agegroup12$Intervention.2002<-factor(rep(c(rep(0,12*12),rep(1,12*3)),31))
-#Hepatitis.B.agegroup12$Intervention.2009<-factor(rep(c(rep(0,12*4),rep(1,12*8),rep(0,12*3)),31))
-Hepatitis.B.agegroup12$Intervention.2009<-factor(rep(c(rep(0,12*4),rep(0,10),rep(1,2+7*12),rep(0,12*3)),31))
-Hepatitis.B.agegroup12$Interaction.2002<-rep(c(rep(0,12*12),c(0:(180-12*12-1))),31)
-#Hepatitis.B.agegroup12$Interaction.2009<-rep(c(rep(0,4*12),c(0:(8*12-1)),rep(0,3*12)),31)
-Hepatitis.B.agegroup12$Interaction.2009<-rep(c(rep(0,4*12),rep(0,10),c(0:(2+7*12-1)),rep(0,3*12)),31)
-Hepatitis.B.agegroup12$Criteria<-rep(c(rep(0,4*12+5),rep(1,180-4*12-5)),31)
-regions<-as.character(unique(Hepatitis.B.agegroup12$Province))
-datalist<-lapply(regions, function(x) Hepatitis.B.agegroup12[Hepatitis.B.agegroup12$Province==x, ])
-seq(datalist)
-yori8.1<-matrix(0, length(datalist), 2, dimnames=list(regions, paste("beta", seq(2,3), sep="")))
-Sori8.1<-vector("list", length(datalist)); names(Sori8.1) <- regions
-yori8.2<-matrix(0, length(datalist), 2, dimnames=list(regions, paste("beta", seq(2,3), sep="")))
-Sori8.2<-vector("list", length(datalist)); names(Sori8.2) <- regions
-y.criteria1<-matrix(0, length(datalist), 1, dimnames=list(regions, "beta"))
-S.criteria1<-Sori2
-y.criteria2<-matrix(0, length(datalist), 1, dimnames=list(regions, "beta"))
-S.criteria2<-Sori2
-for(i in c(1:31))
-{sub.data<-Hepatitis.B.agegroup12[which(Hepatitis.B.agegroup12$Order==i),]
-mfirst<-gam(Case~ offset(log(Population.book))+Intervention.2002+Interaction.2002+
-              Intervention.2009+Interaction.2009+
-              Time+ns(Temperature,df=3)+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
-              Holiday+Criteria+Criteria:Intervention.2002+Criteria:Intervention.2009,#+Holiday+GDP+Birth_Rate
-            family=quasipoisson(link='log'), data=sub.data)
-lengthfun<-length(summary(mfirst)$p.coeff)
-yori8.1[i,c(1:2)] <- as.data.frame(summary(mfirst)$p.coeff)[c(2,3),1]
-Sori8.1[[i]] <- vcov(mfirst)[c(2,3),c(2,3)]
-yori8.2[i,c(1:2)] <- as.data.frame(summary(mfirst)$p.coeff)[c(4,5),1]
-Sori8.2[[i]] <- vcov(mfirst)[c(4,5),c(4,5)]
-y.criteria1[i]<-as.data.frame(summary(mfirst)$p.coeff)[c(lengthfun-1),1]
-S.criteria1[[i]]<-vcov(mfirst)[c(lengthfun-1),c(lengthfun-1)]
-y.criteria2[i]<-as.data.frame(summary(mfirst)$p.coeff)[c(lengthfun),1]
-S.criteria2[[i]]<-vcov(mfirst)[c(lengthfun),c(lengthfun)]
-assign(paste("model8.",i,sep=""),mfirst)
-}
-which(y.criteria1!=0)
-Criteria8.1<-mvmeta(y.criteria1~1, S.criteria1, method="reml")
-summary(Criteria8.1)
-which(y.criteria2!=0)
-Criteria8.2<-mvmeta(y.criteria2~1, S.criteria2, method="reml")
-summary(Criteria8.2)
-
-#Age group 13
-Hepatitis.B.agegroup13<-read.xlsx("Agegroup13.xlsx")
-Hepatitis.B.agegroup13$Month.factor<-factor(Hepatitis.B.agegroup13$Month)
-Hepatitis.B.agegroup13$Time<-rep(c(0:179),31)
-Hepatitis.B.agegroup13$Holiday<-factor(rep(rep(c(1,1,0,0,0,0,2,2,0,0,0,0),15),31))
-Hepatitis.B.agegroup13$Intervention.2009<-factor(rep(c(rep(0,9*12),rep(1,12*6)),31))
-Hepatitis.B.agegroup13$Interaction.2009<-rep(c(rep(0,9*12),c(0:(180-12*9-1))),31)
-Hepatitis.B.agegroup13$Criteria<-rep(c(rep(0,4*12+5),rep(1,180-4*12-5)),31)
-regions<-as.character(unique(Hepatitis.B.agegroup13$Province))
-datalist<-lapply(regions, function(x) Hepatitis.B.agegroup13[Hepatitis.B.agegroup13$Province==x, ])
-seq(datalist)
-yori9<-matrix(0, length(datalist), 2, dimnames=list(regions, paste("beta", seq(2,3), sep="")))
-Sori9<-vector("list", length(datalist)); names(Sori9) <- regions
-y.criteria<-matrix(0, length(datalist), 1, dimnames=list(regions, "beta"))
-S.criteria<-Sori2
-for(i in c(1:31))
-{sub.data<-Hepatitis.B.agegroup13[which(Hepatitis.B.agegroup13$Order==i),]
-mfirst<-gam(Case~ offset(log(Population.book))+Intervention.2009+Interaction.2009+
-              Time+ns(Temperature,df=3)+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
-              Holiday+Criteria+Criteria:Intervention.2009,#+Holiday+GDP+Birth_Rate
-            family=quasipoisson(link='log'), data=sub.data)
-lengthfun<-length(summary(mfirst)$p.coeff)
-yori9[i,c(1:2)] <- as.data.frame(summary(mfirst)$p.coeff)[c(2,3),1]
-Sori9[[i]] <- vcov(mfirst)[c(2,3),c(2,3)]
-y.criteria[i]<-as.data.frame(summary(mfirst)$p.coeff)[c(lengthfun),1]
-S.criteria[[i]]<-vcov(mfirst)[c(lengthfun),c(lengthfun)]
-assign(paste("model9.",i,sep=""),mfirst)
-}
-which(y.criteria!=0)
-Criteria9<-mvmeta(y.criteria~1, S.criteria, method="reml")
-summary(Criteria9)
-
-#Age group 14
-Hepatitis.B.agegroup14<-read.xlsx("Agegroup14.xlsx")
-Hepatitis.B.agegroup14$Month.factor<-factor(Hepatitis.B.agegroup14$Month)
-Hepatitis.B.agegroup14$Time<-rep(c(0:179),31)
-Hepatitis.B.agegroup14$Holiday<-factor(rep(rep(c(1,1,0,0,0,0,2,2,0,0,0,0),15),31))
-Hepatitis.B.agegroup14$Intervention.2009<-factor(rep(c(rep(0,14*12),rep(1,12*1)),31))
-Hepatitis.B.agegroup14$Interaction.2009<-rep(c(rep(0,14*12),c(0:(180-12*14-1))),31)
-Hepatitis.B.agegroup14$Criteria<-rep(c(rep(0,4*12+5),rep(1,180-4*12-5)),31)
-regions<-as.character(unique(Hepatitis.B.agegroup14$Province))
-datalist<-lapply(regions, function(x) Hepatitis.B.agegroup14[Hepatitis.B.agegroup14$Province==x, ])
-seq(datalist)
-yori10<-matrix(0, length(datalist), 2, dimnames=list(regions, paste("beta", seq(2,3), sep="")))
-Sori10<-vector("list", length(datalist)); names(Sori10) <- regions
-y.criteria<-matrix(0, length(datalist), 1, dimnames=list(regions, "beta"))
-S.criteria<-Sori2
-for(i in c(1:31))
-{sub.data<-Hepatitis.B.agegroup14[which(Hepatitis.B.agegroup14$Order==i),]
-mfirst<-gam(Case~ offset(log(Population.book))+Intervention.2009+Interaction.2009+
-              Time+ns(Temperature,df=3)+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
-              Holiday+Criteria+Criteria:Intervention.2009,#+Holiday+GDP+Birth_Rate
-            family=quasipoisson(link='log'), data=sub.data)
-lengthfun<-length(summary(mfirst)$p.coeff)
-yori10[i,c(1:2)] <- as.data.frame(summary(mfirst)$p.coeff)[c(2,3),1]
-Sori10[[i]] <- vcov(mfirst)[c(2,3),c(2,3)]
-y.criteria[i]<-as.data.frame(summary(mfirst)$p.coeff)[c(lengthfun),1]
-S.criteria[[i]]<-vcov(mfirst)[c(lengthfun),c(lengthfun)]
-assign(paste("model10.",i,sep=""),mfirst)
-}
-which(y.criteria!=0)
-Criteria10<-mvmeta(y.criteria~1, S.criteria, method="reml")
-summary(Criteria10)
-
 #######################The random sampling of under-reporting distribution#############
-set.seed(202507)
-Inflation<-c(rnorm(4*12+5,25,5),rnorm(180-4*12-5,15,5))/100
+set.seed(20250717)#set.seed(202507)
+#A left-truncated normal distribution (μ=25%, σ=5%, and truncated point=0) provides a close approximation to
+#a normal distribution (μ=25%, σ=5%).
+Inflation<-c(rnorm(180,25,5))/100
+setwd("D:/~")
 #Age group 6
 Hepatitis.B.agegroup6<-read.xlsx("agegroup6.xlsx")
 Hepatitis.B.agegroup6$Month.factor<-factor(Hepatitis.B.agegroup6$Month)
@@ -6107,9 +5307,7 @@ for(i in c(1:31))
 {sub.data<-Hepatitis.B.agegroup6[which(Hepatitis.B.agegroup6$Order==i),]
 mfirst<-gam(Case.updated~ offset(log(Population.book))+Intervention.2002+Time+
               ns(Temperature,df=3)+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
-              Holiday+Interaction.2002,#+Holiday+GDP+Birth_Rate
+              Holiday+Interaction.2002,
             family=quasipoisson(link='log'), data=sub.data)
 lengthfun<-length(summary(mfirst)$p.coeff)
 yori2[i,c(1:2)] <- as.data.frame(summary(mfirst)$p.coeff)[c(2,lengthfun),1]
@@ -6136,8 +5334,6 @@ for(i in c(1:31))
 {sub.data<-Hepatitis.B.agegroup7[which(Hepatitis.B.agegroup7$Order==i),]
 mfirst<-gam(Case.updated~ offset(log(Population.book))+Intervention.2002+Time+
               ns(Temperature,df=3)+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
               Holiday+Interaction.2002,#+Holiday+GDP+Birth_Rate
             family=quasipoisson(link='log'), data=sub.data)
 lengthfun<-length(summary(mfirst)$p.coeff)
@@ -6165,9 +5361,7 @@ for(i in c(1:31))
 {sub.data<-Hepatitis.B.agegroup8[which(Hepatitis.B.agegroup8$Order==i),]
 mfirst<-gam(Case.updated~ offset(log(Population.book))+Intervention.2002+Time+
               ns(Temperature,df=3)+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
-              Holiday+Interaction.2002,#+Holiday+GDP+Birth_Rate
+              Holiday+Interaction.2002,
             family=quasipoisson(link='log'), data=sub.data)
 lengthfun<-length(summary(mfirst)$p.coeff)
 yori4[i,c(1:2)] <- as.data.frame(summary(mfirst)$p.coeff)[c(2,lengthfun),1]
@@ -6199,9 +5393,7 @@ for(i in c(1:31))
 {sub.data<-Hepatitis.B.agegroup9[which(Hepatitis.B.agegroup9$Order==i),]
 mfirst<-gam(Case~ offset(log(Population.book))+Intervention.2002+#Intervention.2009+
               Time+ns(Temperature,df=3)+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
-              Holiday+Interaction.2002,#+Holiday+GDP+Birth_Rate+Interaction.2009
+              Holiday+Interaction.2002+Interaction.2009,
             family=quasipoisson(link='log'), data=sub.data)
 lengthfun<-length(summary(mfirst)$p.coeff)
 yori5.1[i,c(1:2)] <- as.data.frame(summary(mfirst)$p.coeff)[c(2,lengthfun-1),1]
@@ -6212,8 +5404,6 @@ assign(paste("model5.",i,sep=""),mfirst)
 }
 mvall5.1<-mvmeta(yori5.1[-c(1,2,9,14,26),]~1, Sori5.1[-c(1,2,9,14,26)], method="reml")
 summary(mvall5.1)
-mvall5.2<-mvmeta(yori5.2[-c(1,2,5,9,11,12,14,15,21,25,26),]~1, Sori5.2[-c(1,2,5,9,11,12,14,15,21,25,26)], method="reml")
-summary(mvall5.2)
 
 #Age group 10
 setwd("D:/研究生/乙肝干预/全国研究")
@@ -6240,9 +5430,7 @@ for(i in c(1:31))
 {sub.data<-Hepatitis.B.agegroup10[which(Hepatitis.B.agegroup10$Order==i),]
 mfirst<-gam(Case.updated~ offset(log(Population.book))+Intervention.2002+Intervention.2009+
               Time+ns(Temperature,df=3)+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
-              Holiday+Interaction.2002+Interaction.2009,#+Holiday+GDP+Birth_Rate
+              Holiday+Interaction.2002+Interaction.2009,
             family=quasipoisson(link='log'), data=sub.data)
 lengthfun<-length(summary(mfirst)$p.coeff)
 yori6.1[i,c(1:2)] <- as.data.frame(summary(mfirst)$p.coeff)[c(2,lengthfun-1),1]
@@ -6277,7 +5465,7 @@ for(i in c(1:31))
 {sub.data<-Hepatitis.B.agegroup11[which(Hepatitis.B.agegroup11$Order==i),]
 mfirst<-gam(Case.updated~ offset(log(Population.book))+Intervention.2002+Intervention.2009+
               Time+ns(Temperature,df=3)+
-              Holiday+Interaction.2002+Interaction.2009,#+Holiday+GDP+Birth_Rate
+              Holiday+Interaction.2002+Interaction.2009,
             family=quasipoisson(link='log'), data=sub.data)
 lengthfun<-length(summary(mfirst)$p.coeff)
 yori7.1[i,c(1:2)] <- as.data.frame(summary(mfirst)$p.coeff)[c(2,lengthfun-1),1]
@@ -6312,9 +5500,7 @@ for(i in c(1:31))
 {sub.data<-Hepatitis.B.agegroup12[which(Hepatitis.B.agegroup12$Order==i),]
 mfirst<-gam(Case.updated~ offset(log(Population.book))+Intervention.2002+Intervention.2009+
               Time+ns(Temperature,df=3)+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
-              Holiday+Interaction.2002+Interaction.2009,#+Holiday+GDP+Birth_Rate
+              Holiday+Interaction.2002+Interaction.2009,
             family=quasipoisson(link='log'), data=sub.data)
 lengthfun<-length(summary(mfirst)$p.coeff)
 yori8.1[i,c(1:2)] <- as.data.frame(summary(mfirst)$p.coeff)[c(2,lengthfun-1),1]
@@ -6362,13 +5548,9 @@ Age.pop6<-mean(aggregate(Population.book~Time,
 Age.pop7<-mean(aggregate(Population.book~Time,data=Hepatitis.B.agegroup11,FUN=sum)[,2])
 Age.pop8<-mean(aggregate(Population.book~Time,data=Hepatitis.B.agegroup12,FUN=sum)[,2])
 Age.pop<-c(Age.pop2,Age.pop3,Age.pop4,Age.pop5,Age.pop6,Age.pop7,Age.pop8)
-Sd<-1/c(prod(diag(mvall2$vcov)),
-        prod(diag(mvall3$vcov)),prod(diag(mvall4$vcov)),
-        prod(diag(mvall5.1$vcov)),prod(diag(mvall6.1$vcov)),
-        prod(diag(mvall7.1$vcov)),prod(diag(mvall8.1$vcov)))
-Prop.pop<-c(Age.pop2*Sd[1]/sum(Age.pop*Sd),Age.pop3*Sd[2]/sum(Age.pop*Sd),Age.pop4*Sd[3]/sum(Age.pop*Sd),
-            Age.pop5*Sd[4]/sum(Age.pop*Sd),Age.pop6*Sd[5]/sum(Age.pop*Sd),Age.pop7*Sd[6]/sum(Age.pop*Sd),
-            Age.pop8*Sd[7]/sum(Age.pop*Sd))
+Prop.pop<-c(Age.pop2/sum(Age.pop),Age.pop3/sum(Age.pop),Age.pop4/sum(Age.pop),
+            Age.pop5/sum(Age.pop),Age.pop6/sum(Age.pop),Age.pop7/sum(Age.pop),
+            Age.pop8/sum(Age.pop))
 Merge.coef<-Prop.pop[1]*mvall2$coefficients+Prop.pop[2]*mvall3$coefficients+
   Prop.pop[3]*mvall4$coefficients+Prop.pop[4]*mvall5.1$coefficients+
   Prop.pop[5]*mvall6.1$coefficients+Prop.pop[6]*mvall7.1$coefficients+
@@ -6416,16 +5598,11 @@ datalist<-lapply(regions, function(x) Hepatitis.B.agegroup13[Hepatitis.B.agegrou
 seq(datalist)
 yori9<-matrix(0, length(datalist), 2, dimnames=list(regions, paste("beta", seq(2,3), sep="")))
 Sori9<-vector("list", length(datalist)); names(Sori9) <- regions
-Percent<-as.data.frame(matrix(0,nrow=31,ncol=6))
-Percent[,1]<-regions
-year.pre<-rep(9,31)*12
 for(i in c(1:31))
 {sub.data<-Hepatitis.B.agegroup13[which(Hepatitis.B.agegroup13$Order==i),]
 mfirst<-gam(Case.updated~ offset(log(Population.book))+Intervention.2009+Time+
               ns(Temperature,df=3)+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
-              Holiday+Interaction.2009,#+Holiday+GDP+Birth_Rate
+              Holiday+Interaction.2009,
             family=quasipoisson(link='log'), data=sub.data)
 lengthfun<-length(summary(mfirst)$p.coeff)
 yori9[i,c(1:2)] <- as.data.frame(summary(mfirst)$p.coeff)[c(2,lengthfun),1]
@@ -6448,16 +5625,11 @@ datalist<-lapply(regions, function(x) Hepatitis.B.agegroup14[Hepatitis.B.agegrou
 seq(datalist)
 yori10<-matrix(0, length(datalist), 2, dimnames=list(regions, paste("beta", seq(2,3), sep="")))
 Sori10<-vector("list", length(datalist)); names(Sori10) <- regions
-Percent<-as.data.frame(matrix(0,nrow=31,ncol=6))
-Percent[,1]<-regions
-year.pre<-rep(14,31)*12
 for(i in c(1:31))
 {sub.data<-Hepatitis.B.agegroup14[which(Hepatitis.B.agegroup14$Order==i),]
 mfirst<-gam(Case.updated~ offset(log(Population.book))+Intervention.2009+Time+
               ns(Temperature,df=3)+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
-              Holiday+Interaction.2009,#+Holiday+GDP+Birth_Rate
+              Holiday+Interaction.2009,
             family=quasipoisson(link='log'), data=sub.data)
 lengthfun<-length(summary(mfirst)$p.coeff)
 yori10[i,c(1:2)] <- as.data.frame(summary(mfirst)$p.coeff)[c(2,lengthfun),1]
@@ -6476,11 +5648,8 @@ Age.pop6<-mean(aggregate(Population.book~Time,
 Age.pop9<-mean(aggregate(Population.book~Time,data=Hepatitis.B.agegroup13,FUN=sum)[,2])
 Age.pop10<-mean(aggregate(Population.book~Time,data=Hepatitis.B.agegroup14,FUN=sum)[,2])
 Age.pop.2009<-c(Age.pop6,Age.pop7,Age.pop8,Age.pop9,Age.pop10)
-Sd<-1/c(prod(diag(mvall6.2$vcov)),
-        prod(diag(mvall7.2$vcov)),prod(diag(mvall8.2$vcov)),
-        prod(diag(mvall9$vcov)),prod(diag(mvall10$vcov)))
-Prop.pop.2009<-c(Age.pop6*Sd[1]/sum(Age.pop.2009*Sd),Age.pop7*Sd[2]/sum(Age.pop.2009*Sd),Age.pop8*Sd[3]/sum(Age.pop.2009*Sd),
-                 Age.pop9*Sd[4]/sum(Age.pop.2009*Sd),Age.pop10*Sd[5]/sum(Age.pop.2009*Sd))
+Prop.pop.2009<-c(Age.pop6/sum(Age.pop.2009),Age.pop7/sum(Age.pop.2009),Age.pop8/sum(Age.pop.2009),
+                 Age.pop9/sum(Age.pop.2009),Age.pop10/sum(Age.pop.2009))
 Merge.coef.2009<-Prop.pop.2009[1]*mvall6.2$coefficients+
   Prop.pop.2009[2]*mvall7.2$coefficients+Prop.pop.2009[3]*mvall8.2$coefficients+
   Prop.pop.2009[4]*mvall9$coefficients+Prop.pop.2009[5]*mvall10$coefficients
@@ -6530,9 +5699,7 @@ for(i in c(1:31))
 {sub.data<-Hepatitis.B.agegroup5[which(Hepatitis.B.agegroup5$Order==i),]
 mfirst<-gam(Case~ offset(log(Population.book))+Intervention.2002+Time+
               ns(Temperature,df=3)+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
-              Holiday+Interaction.2002,#+Holiday+GDP+Birth_Rate
+              Holiday+Interaction.2002,
             family=quasipoisson(link='log'),data=sub.data)
 lengthfun<-length(summary(mfirst)$p.coeff)
 yori1[i,c(1:2)] <- as.data.frame(summary(mfirst)$p.coeff)[c(2,lengthfun),1]
@@ -6558,9 +5725,7 @@ for(i in c(1:31))
 {sub.data<-Hepatitis.B.agegroup6[which(Hepatitis.B.agegroup6$Order==i),]
 mfirst<-gam(Case~ offset(log(Population.book))+Intervention.2002+Time+
               ns(Temperature,df=3)+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
-              Holiday+Interaction.2002,#+Holiday+GDP+Birth_Rate
+              Holiday+Interaction.2002,
             family=quasipoisson(link='log'), data=sub.data)
 lengthfun<-length(summary(mfirst)$p.coeff)
 yori2[i,c(1:2)] <- as.data.frame(summary(mfirst)$p.coeff)[c(2,lengthfun),1]
@@ -6586,9 +5751,7 @@ for(i in c(1:31))
 {sub.data<-Hepatitis.B.agegroup7[which(Hepatitis.B.agegroup7$Order==i),]
 mfirst<-gam(Case~ offset(log(Population.book))+Intervention.2002+Time+
               ns(Temperature,df=3)+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
-              Holiday+Interaction.2002,#+Holiday+GDP+Birth_Rate
+              Holiday+Interaction.2002,
             family=quasipoisson(link='log'), data=sub.data)
 lengthfun<-length(summary(mfirst)$p.coeff)
 yori3[i,c(1:2)] <- as.data.frame(summary(mfirst)$p.coeff)[c(2,lengthfun),1]
@@ -6614,9 +5777,7 @@ for(i in c(1:31))
 {sub.data<-Hepatitis.B.agegroup8[which(Hepatitis.B.agegroup8$Order==i),]
 mfirst<-gam(Case~ offset(log(Population.book))+Intervention.2002+Time+
               ns(Temperature,df=3)+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
-              Holiday+Interaction.2002,#+Holiday+GDP+Birth_Rate
+              Holiday+Interaction.2002,
             family=quasipoisson(link='log'), data=sub.data)
 lengthfun<-length(summary(mfirst)$p.coeff)
 yori4[i,c(1:2)] <- as.data.frame(summary(mfirst)$p.coeff)[c(2,lengthfun),1]
@@ -6646,9 +5807,7 @@ for(i in c(1:31))
 {sub.data<-Hepatitis.B.agegroup9[which(Hepatitis.B.agegroup9$Order==i),]
 mfirst<-gam(Case~ offset(log(Population.book))+Intervention.2002+Intervention.2009+
               Time+ns(Temperature,df=3)+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
-              Holiday+Interaction.2002+Interaction.2009,#+Holiday+GDP+Birth_Rate
+              Holiday+Interaction.2002+Interaction.2009,
             family=quasipoisson(link='log'), data=sub.data)
 lengthfun<-length(summary(mfirst)$p.coeff)
 yori5.1[i,c(1:2)] <- as.data.frame(summary(mfirst)$p.coeff)[c(2,lengthfun-1),1]
@@ -6682,9 +5841,7 @@ for(i in c(1:31))
 {sub.data<-Hepatitis.B.agegroup10[which(Hepatitis.B.agegroup10$Order==i),]
 mfirst<-gam(Case~ offset(log(Population.book))+Intervention.2002+Intervention.2009+
               Time+ns(Temperature,df=3)+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
-              Holiday+Interaction.2002+Interaction.2009,#+Holiday+GDP+Birth_Rate
+              Holiday+Interaction.2002+Interaction.2009,
             family=quasipoisson(link='log'), data=sub.data)
 lengthfun<-length(summary(mfirst)$p.coeff)
 yori6.1[i,c(1:2)] <- as.data.frame(summary(mfirst)$p.coeff)[c(2,lengthfun-1),1]
@@ -6718,9 +5875,7 @@ for(i in c(1:31))
 {sub.data<-Hepatitis.B.agegroup11[which(Hepatitis.B.agegroup11$Order==i),]
 mfirst<-gam(Case~ offset(log(Population.book))+Intervention.2002+Intervention.2009+
               Time+ns(Temperature,df=3)+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
-              Holiday+Interaction.2002+Interaction.2009,#+Holiday+GDP+Birth_Rate
+              Holiday+Interaction.2002+Interaction.2009,
             family=quasipoisson(link='log'), data=sub.data)
 lengthfun<-length(summary(mfirst)$p.coeff)
 yori7.1[i,c(1:2)] <- as.data.frame(summary(mfirst)$p.coeff)[c(2,lengthfun-1),1]
@@ -6754,9 +5909,7 @@ for(i in c(1:31))
 {sub.data<-Hepatitis.B.agegroup12[which(Hepatitis.B.agegroup12$Order==i),]
 mfirst<-gam(Case~ offset(log(Population.book))+Intervention.2002+Intervention.2009+
               Time+ns(Temperature,df=3)+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
-              Holiday+Interaction.2002+Interaction.2009,#+Holiday+GDP+Birth_Rate
+              Holiday+Interaction.2002+Interaction.2009,
             family=quasipoisson(link='log'), data=sub.data)
 lengthfun<-length(summary(mfirst)$p.coeff)
 yori8.1[i,c(1:2)] <- as.data.frame(summary(mfirst)$p.coeff)[c(2,lengthfun-1),1]
@@ -6811,13 +5964,9 @@ Age.pop6<-mean(aggregate(Population.book~Time,
 Age.pop7<-mean(aggregate(Population.book~Time,data=Hepatitis.B.agegroup11,FUN=sum)[,2])
 Age.pop8<-mean(aggregate(Population.book~Time,data=Hepatitis.B.agegroup12,FUN=sum)[,2])
 Age.pop<-c(Age.pop1,Age.pop2,Age.pop3,Age.pop4,Age.pop5,Age.pop6,Age.pop7,Age.pop8)
-Sd<-1/c(prod(diag(mvall1$vcov)),prod(diag(mvall2$vcov)),
-        prod(diag(mvall3$vcov)),prod(diag(mvall4$vcov)),
-        prod(diag(mvall5.1$vcov)),prod(diag(mvall6.1$vcov)),
-        prod(diag(mvall7.1$vcov)),prod(diag(mvall8.1$vcov)))
-Prop.pop<-c(Age.pop1*Sd[1]/sum(Age.pop*Sd),Age.pop2*Sd[2]/sum(Age.pop*Sd),Age.pop3*Sd[3]/sum(Age.pop*Sd),
-            Age.pop4*Sd[4]/sum(Age.pop*Sd),Age.pop5*Sd[5]/sum(Age.pop*Sd),Age.pop6*Sd[6]/sum(Age.pop*Sd),
-            Age.pop7*Sd[7]/sum(Age.pop*Sd),Age.pop8*Sd[7]/sum(Age.pop*Sd))
+Prop.pop<-c(Age.pop1/sum(Age.pop),Age.pop2/sum(Age.pop),Age.pop3/sum(Age.pop),
+            Age.pop4/sum(Age.pop),Age.pop5/sum(Age.pop),Age.pop6/sum(Age.pop),
+            Age.pop7/sum(Age.pop),Age.pop8/sum(Age.pop))
 Merge.coef<-Prop.pop[1]*mvall1$coefficients+Prop.pop[2]*mvall2$coefficients+
   Prop.pop[3]*mvall3$coefficients+Prop.pop[4]*mvall4$coefficients+
   Prop.pop[5]*mvall5.1$coefficients+Prop.pop[6]*mvall6.1$coefficients+
@@ -6878,1786 +6027,3 @@ assign(paste("model9.",i,sep=""),mfirst)
 }
 mvall9<-mvmeta(yori9~1, Sori9, method="reml")
 summary(mvall9)
-
-#Age group 14
-Hepatitis.B.agegroup14<-read.xlsx("Agegroup14.xlsx")
-Hepatitis.B.agegroup14$Month.factor<-factor(Hepatitis.B.agegroup14$Month)
-Hepatitis.B.agegroup14$Time<-rep(c(0:179),31)
-Hepatitis.B.agegroup14$Holiday<-factor(rep(rep(c(1,1,0,0,0,0,2,2,0,0,0,0),15),31))
-Hepatitis.B.agegroup14$Intervention.2009<-factor(rep(c(rep(0,14*12),rep(1,12*1)),31))
-Hepatitis.B.agegroup14$Interaction.2009<-rep(c(rep(0,14*12),c(0:(180-12*14-1))),31)
-regions<-as.character(unique(Hepatitis.B.agegroup14$Province))
-datalist<-lapply(regions, function(x) Hepatitis.B.agegroup14[Hepatitis.B.agegroup14$Province==x, ])
-seq(datalist)
-yori10<-matrix(0, length(datalist), 2, dimnames=list(regions, paste("beta", seq(2,3), sep="")))
-Sori10<-vector("list", length(datalist)); names(Sori10) <- regions
-for(i in c(1:31))
-{sub.data<-Hepatitis.B.agegroup14[which(Hepatitis.B.agegroup14$Order==i),]
-mfirst<-gam(Case~ offset(log(Population.book))+Intervention.2009+Time+
-              ns(Temperature,df=3)+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
-              Holiday+Interaction.2009,#+Holiday+GDP+Birth_Rate
-            family=quasipoisson(link='log'), data=sub.data)
-lengthfun<-length(summary(mfirst)$p.coeff)
-yori10[i,c(1:2)] <- as.data.frame(summary(mfirst)$p.coeff)[c(2,lengthfun),1]
-Sori10[[i]] <- vcov(mfirst)[c(2,lengthfun),c(2,lengthfun)]
-assign(paste("model10.",i,sep=""),mfirst)
-}
-mvall10<-mvmeta(yori10~1, Sori10, method="reml")
-summary(mvall10)
-
-#Calculate the weights
-Age.pop6<-mean(aggregate(Population.book~Time,
-                         data=Hepatitis.B.agegroup10[-which(Hepatitis.B.agegroup10$Order==1 |
-                                                              Hepatitis.B.agegroup10$Order==2 |
-                                                              Hepatitis.B.agegroup10$Order==9 |
-                                                              Hepatitis.B.agegroup10$Order==26),],FUN=sum)[,2])
-Age.pop9<-mean(aggregate(Population.book~Time,data=Hepatitis.B.agegroup13,FUN=sum)[,2])
-Age.pop10<-mean(aggregate(Population.book~Time,data=Hepatitis.B.agegroup14,FUN=sum)[,2])
-Age.pop.2009<-c(Age.pop6,Age.pop7,Age.pop8,Age.pop9,Age.pop10)
-Sd<-1/c(prod(diag(mvall6.2$vcov)),
-        prod(diag(mvall7.2$vcov)),prod(diag(mvall8.2$vcov)),
-        prod(diag(mvall9$vcov)),prod(diag(mvall10$vcov)))
-Prop.pop.2009<-c(Age.pop6*Sd[1]/sum(Age.pop.2009*Sd),Age.pop7*Sd[2]/sum(Age.pop.2009*Sd),Age.pop8*Sd[3]/sum(Age.pop.2009*Sd),
-                 Age.pop9*Sd[4]/sum(Age.pop.2009*Sd),Age.pop10*Sd[5]/sum(Age.pop.2009*Sd))
-Merge.coef.2009<-Prop.pop.2009[1]*mvall6.2$coefficients+
-  Prop.pop.2009[2]*mvall7.2$coefficients+Prop.pop.2009[3]*mvall8.2$coefficients+
-  Prop.pop.2009[4]*mvall9$coefficients+Prop.pop.2009[5]*mvall10$coefficients
-Merge.vcov.2009<-Prop.pop.2009[1]^2*mvall6.2$vcov+
-  Prop.pop.2009[2]^2*mvall7.2$vcov+Prop.pop.2009[3]^2*mvall8.2$vcov+
-  Prop.pop.2009[4]^2*mvall9$vcov+Prop.pop.2009[5]^2*mvall10$vcov
-
-coef.meta<-as.matrix(t(Merge.coef.2009))
-time.meta<-as.matrix(cbind(rep(1,180-7*12),c((7*12):179)-7*12))
-cov.meta<-Merge.vcov.2009
-pre.ER.meta<-c()
-ER.meta<-c()
-se.ER.meta<-c()
-ER.low.meta<-c()
-ER.high.meta<-c()
-for(l in 1:(180-7*12))
-{pre.ER.meta[l]<-time.meta[l,]%*%coef.meta
-ER.meta[l]<-(exp(pre.ER.meta[l])-1)*100
-se.ER.meta[l]<-sqrt(time.meta[l,]%*%cov.meta%*%t(t(time.meta[l,]))) 
-ER.low.meta[l]=(exp(pre.ER.meta[l]-1.96*se.ER.meta[l])-1)*100
-ER.high.meta[l]=(exp(pre.ER.meta[l]+1.96*se.ER.meta[l])-1)*100
-}
-ER.whole<-ER.meta
-ER.whole.low<-ER.low.meta
-ER.whole.upper<-ER.high.meta
-month.meta<-c((7*12+1):180)
-ER<-data.frame(Time=month.meta,ER=ER.meta,ER.lower=ER.low.meta,ER.upper=ER.high.meta)
-ER$ER<-sprintf("%0.2f",ER$ER)
-ER$ER.lower<-sprintf("%0.2f",ER$ER.lower)
-ER$ER.upper<-sprintf("%0.2f",ER$ER.upper)
-
-#######################The correlation of the time term and three socio-economic factors#####
-#Bed
-Bed<-read.xlsx("D:/研究生/乙肝干预/全国研究/二版结果/亚组/床位数.xlsx")
-Bed<-Bed[-32,-2]
-Bed<-reshape2::melt(Bed,id.vars="Region")
-colnames(Bed)<-c("Province","Year","Bed")
-
-#Urbanisation
-Urb<-read.xlsx("D:/研究生/乙肝干预/全国研究/二版结果/亚组/各省市城镇人口占比.xlsx")
-Urb<-Urb[-32,-2]
-Urb<-reshape2::melt(Urb,id.vars="Region")
-colnames(Urb)<-c("Province","Year","Urbanisation")
-
-#Illiteracy rate
-Ill<-read.xlsx("D:/研究生/乙肝干预/全国研究/二版结果/亚组/各省市文盲率.xlsx")
-Ill<-Ill[-32,]
-Ill<-reshape2::melt(Ill,id.vars="Region")
-colnames(Ill)<-c("Province","Year","Illiteracy")
-
-Socio<-cbind(Bed,Urb$Urbanisation,Ill$Illiteracy)
-Socio$Year<-as.numeric(Socio$Year)
-colnames(Socio)<-c("Province","Orders","Bed","Urbanisation","Illiteracy")
-
-#Calculating Spearman correlation coefficients
-Province<-unique(Socio$Province)
-Spearman<-list()
-for(i in 1:31)
-{Spearman[[i]]<-cor(Socio[which(Socio$Province==Province[i]),-1],method=c("spearman"))
-}
-names(Spearman)<-Province
-File<-createWorkbook()
-lapply(names(Spearman),function(sheet_name){
-  addWorksheet(File,sheetName=sheet_name)
-  writeData(File,sheet=sheet_name,x=Spearman[[sheet_name]])
-})
-saveWorkbook(File,"D:/研究生/乙肝干预/全国研究/二版结果/Correlation.xlsx",overwrite=T)
-
-Year.Bed.cor<-sapply(Spearman,function(x){x[1,2]})
-mean(Year.Bed.cor)
-Year.Urb.cor<-sapply(Spearman,function(x){x[1,3]})
-mean(Year.Urb.cor)
-Year.Ill.cor<-sapply(Spearman,function(x){x[1,4]})
-mean(Year.Ill.cor)
-Bed.Urb.cor<-sapply(Spearman,function(x){x[2,3]})
-mean(Bed.Urb.cor)
-Bed.Ill.cor<-sapply(Spearman,function(x){x[2,4]})
-mean(Bed.Ill.cor)
-Urb.Ill.cor<-sapply(Spearman,function(x){x[3,4]})
-mean(Urb.Ill.cor)
-Socio$Year<-Socio$Orders+2004
-
-#Age group 6
-Hepatitis.B.agegroup6<-read.xlsx("agegroup6.xlsx")
-Hepatitis.B.agegroup6$Month.factor<-factor(Hepatitis.B.agegroup6$Month)
-Hepatitis.B.agegroup6$Time<-rep(c(0:179),31)
-Hepatitis.B.agegroup6$Holiday<-factor(rep(rep(c(1,1,0,0,0,0,2,2,0,0,0,0),15),31))
-Hepatitis.B.agegroup6$Intervention.2002<-factor(rep(c(rep(0,12*2),rep(1,13*12)),31))
-Hepatitis.B.agegroup6$Interaction.2002<-rep(c(rep(0,2*12),c(0:(180-2*12-1))),31)
-Hepatitis.B.agegroup6<-left_join(Hepatitis.B.agegroup6,Socio,by=c("Province","Year"))
-VIF<-lapply(1:9,function(x){matrix(0,nrow=31,ncol=6)})
-for(i in c(1:31))
-{sub.data<-Hepatitis.B.agegroup6[which(Hepatitis.B.agegroup6$Order==i),]
-#Concurrent inclusion
-mfirst<-gam(Case~ offset(log(Population.book))+Intervention.2002+Time+
-              Temperature+Bed+Urbanisation+Illiteracy+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
-              Holiday+Interaction.2002,#+Holiday+GDP+Birth_Rate
-            family=quasipoisson(link='log'), data=sub.data)
-mfirst<-model.matrix(mfirst)[,-1]
-#Calculating VIFs
-Vif.values<-sapply(1:ncol(mfirst),function(i){
-  r.square<-summary(gam(mfirst[,i]~mfirst[,-i]),
-                    family=quasipoisson(link='log'),
-                    data=mfirst)$r.sq
-  1/(1-r.square)
-})
-names(Vif.values)<-colnames(mfirst)
-VIF[[1]][i,1]<-Vif.values[4]
-VIF[[1]][i,2]<-Vif.values[5]
-VIF[[1]][i,3]<-Vif.values[6]
-#VIF[i,1]<-car::vif(mfirst)[4,3]
-#VIF[i,2]<-car::vif(mfirst)[5,3]
-#VIF[i,3]<-car::vif(mfirst)[6,3]
-#Separate inclusion
-mfirst1<-gam(Case~ offset(log(Population.book))+Intervention.2002+Time+
-               Temperature+Bed+
-               #ns(Rain,df=4)+ns(Wind,df=4)+
-               #ns(Sunshine,df=4)+
-               Holiday+Interaction.2002,#+Holiday+GDP+Birth_Rate
-             family=quasipoisson(link='log'), data=sub.data)
-mfirst1<-model.matrix(mfirst1)[,-1]
-Vif.values<-sapply(1:ncol(mfirst1),function(i){
-  r.square<-summary(gam(mfirst1[,i]~mfirst1[,-i]),
-                    family=quasipoisson(link='log'),
-                    data=mfirst1)$r.sq
-  1/(1-r.square)
-})
-names(Vif.values)<-colnames(mfirst1)
-VIF[[1]][i,4]<-Vif.values[4]
-#VIF[i,4]<-car::vif(mfirst1)[4,3]
-mfirst2<-gam(Case~ offset(log(Population.book))+Intervention.2002+Time+
-               Temperature+Urbanisation+
-               #ns(Rain,df=4)+ns(Wind,df=4)+
-               #ns(Sunshine,df=4)+
-               Holiday+Interaction.2002,#+Holiday+GDP+Birth_Rate
-             family=quasipoisson(link='log'), data=sub.data)
-mfirst2<-model.matrix(mfirst2)[,-1]
-Vif.values<-sapply(1:ncol(mfirst2),function(i){
-  r.square<-summary(gam(mfirst2[,i]~mfirst2[,-i]),
-                    family=quasipoisson(link='log'),
-                    data=mfirst2)$r.sq
-  1/(1-r.square)
-})
-names(Vif.values)<-colnames(mfirst2)
-VIF[[1]][i,5]<-Vif.values[4]
-#VIF[i,5]<-car::vif(mfirst2)[4,3]
-mfirst3<-gam(Case~ offset(log(Population.book))+Intervention.2002+Time+
-               Temperature+Illiteracy+
-               #ns(Rain,df=4)+ns(Wind,df=4)+
-               #ns(Sunshine,df=4)+
-               Holiday+Interaction.2002,#+Holiday+GDP+Birth_Rate
-             family=quasipoisson(link='log'), data=sub.data)
-mfirst3<-model.matrix(mfirst3)[,-1]
-Vif.values<-sapply(1:ncol(mfirst3),function(i){
-  r.square<-summary(gam(mfirst3[,i]~mfirst3[,-i]),
-                    family=quasipoisson(link='log'),
-                    data=mfirst3)$r.sq
-  1/(1-r.square)
-})
-names(Vif.values)<-colnames(mfirst3)
-VIF[[1]][i,6]<-Vif.values[4]
-#VIF[i,6]<-car::vif(mfirst3)[4,3]
-}
-
-#Age group 7
-Hepatitis.B.agegroup7<-read.xlsx("agegroup7.xlsx")
-Hepatitis.B.agegroup7$Month.factor<-factor(Hepatitis.B.agegroup7$Month)
-Hepatitis.B.agegroup7$Time<-rep(c(0:179),31)
-Hepatitis.B.agegroup7$Holiday<-factor(rep(rep(c(1,1,0,0,0,0,2,2,0,0,0,0),15),31))
-Hepatitis.B.agegroup7$Intervention.2002<-factor(rep(c(rep(0,12*3),rep(1,12*12)),31))
-Hepatitis.B.agegroup7$Interaction.2002<-rep(c(rep(0,3*12),c(0:(180-3*12-1))),31)
-Hepatitis.B.agegroup7<-left_join(Hepatitis.B.agegroup7,Socio,by=c("Province","Year"))
-for(i in c(1:31))
-{sub.data<-Hepatitis.B.agegroup7[which(Hepatitis.B.agegroup7$Order==i),]
-mfirst<-gam(Case~ offset(log(Population.book))+Intervention.2002+Time+
-              Temperature+Bed+Urbanisation+Illiteracy+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
-              Holiday+Interaction.2002,#+Holiday+GDP+Birth_Rate
-            family=quasipoisson(link='log'), data=sub.data)
-mfirst<-model.matrix(mfirst)[,-1]
-Vif.values<-sapply(1:ncol(mfirst),function(i){
-  r.square<-summary(gam(mfirst[,i]~mfirst[,-i]),
-                    family=quasipoisson(link='log'),
-                    data=mfirst)$r.sq
-  1/(1-r.square)
-})
-names(Vif.values)<-colnames(mfirst)
-VIF[[2]][i,1]<-Vif.values[4]
-VIF[[2]][i,2]<-Vif.values[5]
-VIF[[2]][i,3]<-Vif.values[6]
-mfirst1<-gam(Case~ offset(log(Population.book))+Intervention.2002+Time+
-               Temperature+Bed+
-               #ns(Rain,df=4)+ns(Wind,df=4)+
-               #ns(Sunshine,df=4)+
-               Holiday+Interaction.2002,#+Holiday+GDP+Birth_Rate
-             family=quasipoisson(link='log'), data=sub.data)
-mfirst1<-model.matrix(mfirst1)[,-1]
-Vif.values<-sapply(1:ncol(mfirst1),function(i){
-  r.square<-summary(gam(mfirst1[,i]~mfirst1[,-i]),
-                    family=quasipoisson(link='log'),
-                    data=mfirst1)$r.sq
-  1/(1-r.square)
-})
-names(Vif.values)<-colnames(mfirst1)
-VIF[[2]][i,4]<-Vif.values[4]
-mfirst2<-gam(Case~ offset(log(Population.book))+Intervention.2002+Time+
-               Temperature+Urbanisation+
-               #ns(Rain,df=4)+ns(Wind,df=4)+
-               #ns(Sunshine,df=4)+
-               Holiday+Interaction.2002,#+Holiday+GDP+Birth_Rate
-             family=quasipoisson(link='log'), data=sub.data)
-mfirst2<-model.matrix(mfirst2)[,-1]
-Vif.values<-sapply(1:ncol(mfirst2),function(i){
-  r.square<-summary(gam(mfirst2[,i]~mfirst2[,-i]),
-                    family=quasipoisson(link='log'),
-                    data=mfirst2)$r.sq
-  1/(1-r.square)
-})
-names(Vif.values)<-colnames(mfirst2)
-VIF[[2]][i,5]<-Vif.values[4]
-#VIF[i,5]<-car::vif(mfirst2)[4,3]
-mfirst3<-gam(Case~ offset(log(Population.book))+Intervention.2002+Time+
-               Temperature+Illiteracy+
-               #ns(Rain,df=4)+ns(Wind,df=4)+
-               #ns(Sunshine,df=4)+
-               Holiday+Interaction.2002,#+Holiday+GDP+Birth_Rate
-             family=quasipoisson(link='log'), data=sub.data)
-mfirst3<-model.matrix(mfirst3)[,-1]
-Vif.values<-sapply(1:ncol(mfirst3),function(i){
-  r.square<-summary(gam(mfirst3[,i]~mfirst3[,-i]),
-                    family=quasipoisson(link='log'),
-                    data=mfirst3)$r.sq
-  1/(1-r.square)
-})
-names(Vif.values)<-colnames(mfirst3)
-VIF[[2]][i,6]<-Vif.values[4]
-}
-
-
-#Age group 8
-setwd("D:/研究生/乙肝干预/全国研究")
-Hepatitis.B.agegroup8<-read.xlsx("agegroup8.xlsx")
-Hepatitis.B.agegroup8$Month.factor<-factor(Hepatitis.B.agegroup8$Month)
-Hepatitis.B.agegroup8$Time<-rep(c(0:179),31)
-Hepatitis.B.agegroup8$Holiday<-factor(rep(rep(c(1,1,0,0,0,0,2,2,0,0,0,0),15),31))
-Hepatitis.B.agegroup8$Intervention.2002<-factor(rep(c(rep(0,12*4),rep(1,12*11)),31))
-Hepatitis.B.agegroup8$Interaction.2002<-rep(c(rep(0,4*12),c(0:(180-4*12-1))),31)
-Hepatitis.B.agegroup8<-left_join(Hepatitis.B.agegroup8,Socio,by=c("Province","Year"))
-for(i in c(1:31))
-{sub.data<-Hepatitis.B.agegroup8[which(Hepatitis.B.agegroup8$Order==i),]
-mfirst<-gam(Case~ offset(log(Population.book))+Intervention.2002+Time+
-              Temperature+Bed+Urbanisation+Illiteracy+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
-              Holiday+Interaction.2002,#+Holiday+GDP+Birth_Rate
-            family=quasipoisson(link='log'), data=sub.data)
-mfirst<-model.matrix(mfirst)[,-1]
-Vif.values<-sapply(1:ncol(mfirst),function(i){
-  r.square<-summary(gam(mfirst[,i]~mfirst[,-i]),
-                    family=quasipoisson(link='log'),
-                    data=mfirst)$r.sq
-  1/(1-r.square)
-})
-names(Vif.values)<-colnames(mfirst)
-VIF[[3]][i,1]<-Vif.values[4]
-VIF[[3]][i,2]<-Vif.values[5]
-VIF[[3]][i,3]<-Vif.values[6]
-mfirst1<-gam(Case~ offset(log(Population.book))+Intervention.2002+Time+
-               Temperature+Bed+
-               #ns(Rain,df=4)+ns(Wind,df=4)+
-               #ns(Sunshine,df=4)+
-               Holiday+Interaction.2002,#+Holiday+GDP+Birth_Rate
-             family=quasipoisson(link='log'), data=sub.data)
-mfirst1<-model.matrix(mfirst1)[,-1]
-Vif.values<-sapply(1:ncol(mfirst1),function(i){
-  r.square<-summary(gam(mfirst1[,i]~mfirst1[,-i]),
-                    family=quasipoisson(link='log'),
-                    data=mfirst1)$r.sq
-  1/(1-r.square)
-})
-names(Vif.values)<-colnames(mfirst1)
-VIF[[3]][i,4]<-Vif.values[4]
-mfirst2<-gam(Case~ offset(log(Population.book))+Intervention.2002+Time+
-               Temperature+Urbanisation+
-               #ns(Rain,df=4)+ns(Wind,df=4)+
-               #ns(Sunshine,df=4)+
-               Holiday+Interaction.2002,#+Holiday+GDP+Birth_Rate
-             family=quasipoisson(link='log'), data=sub.data)
-mfirst2<-model.matrix(mfirst2)[,-1]
-Vif.values<-sapply(1:ncol(mfirst2),function(i){
-  r.square<-summary(gam(mfirst2[,i]~mfirst2[,-i]),
-                    family=quasipoisson(link='log'),
-                    data=mfirst2)$r.sq
-  1/(1-r.square)
-})
-names(Vif.values)<-colnames(mfirst2)
-VIF[[3]][i,5]<-Vif.values[4]
-#VIF[i,5]<-car::vif(mfirst2)[4,3]
-mfirst3<-gam(Case~ offset(log(Population.book))+Intervention.2002+Time+
-               Temperature+Illiteracy+
-               #ns(Rain,df=4)+ns(Wind,df=4)+
-               #ns(Sunshine,df=4)+
-               Holiday+Interaction.2002,#+Holiday+GDP+Birth_Rate
-             family=quasipoisson(link='log'), data=sub.data)
-mfirst3<-model.matrix(mfirst3)[,-1]
-Vif.values<-sapply(1:ncol(mfirst3),function(i){
-  r.square<-summary(gam(mfirst3[,i]~mfirst3[,-i]),
-                    family=quasipoisson(link='log'),
-                    data=mfirst3)$r.sq
-  1/(1-r.square)
-})
-names(Vif.values)<-colnames(mfirst3)
-VIF[[3]][i,6]<-Vif.values[4]
-}
-
-
-#Age group 9
-setwd("D:/研究生/乙肝干预/全国研究")
-Hepatitis.B.agegroup9<-read.xlsx("agegroup9.xlsx")
-Hepatitis.B.agegroup9$Month.factor<-factor(Hepatitis.B.agegroup9$Month)
-Hepatitis.B.agegroup9$Time<-rep(c(0:179),31)
-Hepatitis.B.agegroup9$Holiday<-factor(rep(rep(c(1,1,0,0,0,0,2,2,0,0,0,0),15),31))
-Hepatitis.B.agegroup9$Intervention.2002<-factor(rep(c(rep(0,12*5),rep(1,12*10)),31))
-Hepatitis.B.agegroup9$Intervention.2009<-factor(rep(c(rep(0,12*4),rep(0,10),rep(1,2),rep(0,12*10)),31))
-Hepatitis.B.agegroup9$Interaction.2002<-rep(c(rep(0,5*12),c(0:(180-5*12-1))),31)
-Hepatitis.B.agegroup9$Interaction.2009<-rep(c(rep(0,4*12),rep(0,10),c(0:(2-1)),rep(0,10*12)),31)
-Hepatitis.B.agegroup9<-left_join(Hepatitis.B.agegroup9,Socio,by=c("Province","Year"))
-for(i in c(1:31))
-{sub.data<-Hepatitis.B.agegroup9[which(Hepatitis.B.agegroup9$Order==i),]
-mfirst<-gam(Case~ offset(log(Population.book))+Intervention.2002+Intervention.2009+
-              Time+Temperature+Bed+Urbanisation+Illiteracy+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
-              Holiday+Interaction.2002+Interaction.2009,#+Holiday+GDP+Birth_Rate
-            family=quasipoisson(link='log'), data=sub.data)
-mfirst<-model.matrix(mfirst)[,-1]
-Vif.values<-sapply(1:ncol(mfirst),function(i){
-  r.square<-summary(gam(mfirst[,i]~mfirst[,-i]),
-                    family=quasipoisson(link='log'),
-                    data=mfirst)$r.sq
-  1/(1-r.square)
-})
-names(Vif.values)<-colnames(mfirst)
-VIF[[4]][i,1]<-Vif.values[5]
-VIF[[4]][i,2]<-Vif.values[6]
-VIF[[4]][i,3]<-Vif.values[7]
-mfirst1<-gam(Case~ offset(log(Population.book))+Intervention.2002+Intervention.2009+Time+
-               Temperature+Bed+
-               #ns(Rain,df=4)+ns(Wind,df=4)+
-               #ns(Sunshine,df=4)+
-               Holiday+Interaction.2002+Interaction.2009,#+Holiday+GDP+Birth_Rate
-             family=quasipoisson(link='log'), data=sub.data)
-mfirst1<-model.matrix(mfirst1)[,-1]
-Vif.values<-sapply(1:ncol(mfirst1),function(i){
-  r.square<-summary(gam(mfirst1[,i]~mfirst1[,-i]),
-                    family=quasipoisson(link='log'),
-                    data=mfirst1)$r.sq
-  1/(1-r.square)
-})
-names(Vif.values)<-colnames(mfirst1)
-VIF[[4]][i,4]<-Vif.values[5]
-mfirst2<-gam(Case~ offset(log(Population.book))+Intervention.2002+Intervention.2009+Time+
-               Temperature+Urbanisation+
-               #ns(Rain,df=4)+ns(Wind,df=4)+
-               #ns(Sunshine,df=4)+
-               Holiday+Interaction.2002+Interaction.2009,#+Holiday+GDP+Birth_Rate
-             family=quasipoisson(link='log'), data=sub.data)
-mfirst2<-model.matrix(mfirst2)[,-1]
-Vif.values<-sapply(1:ncol(mfirst2),function(i){
-  r.square<-summary(gam(mfirst2[,i]~mfirst2[,-i]),
-                    family=quasipoisson(link='log'),
-                    data=mfirst2)$r.sq
-  1/(1-r.square)
-})
-names(Vif.values)<-colnames(mfirst2)
-VIF[[4]][i,5]<-Vif.values[5]
-#VIF[i,5]<-car::vif(mfirst2)[4,3]
-mfirst3<-gam(Case~ offset(log(Population.book))+Intervention.2002+Intervention.2009+Time+
-               Temperature+Illiteracy+
-               #ns(Rain,df=4)+ns(Wind,df=4)+
-               #ns(Sunshine,df=4)+
-               Holiday+Interaction.2002+Interaction.2009,#+Holiday+GDP+Birth_Rate
-             family=quasipoisson(link='log'), data=sub.data)
-mfirst3<-model.matrix(mfirst3)[,-1]
-Vif.values<-sapply(1:ncol(mfirst3),function(i){
-  r.square<-summary(gam(mfirst3[,i]~mfirst3[,-i]),
-                    family=quasipoisson(link='log'),
-                    data=mfirst3)$r.sq
-  1/(1-r.square)
-})
-names(Vif.values)<-colnames(mfirst3)
-VIF[[4]][i,6]<-Vif.values[5]
-}
-
-#Age group 10
-Hepatitis.B.agegroup10<-read.xlsx("agegroup10.xlsx")
-Hepatitis.B.agegroup10$Month.factor<-factor(Hepatitis.B.agegroup10$Month)
-Hepatitis.B.agegroup10$Time<-rep(c(0:179),31)
-Hepatitis.B.agegroup10$Holiday<-factor(rep(rep(c(1,1,0,0,0,0,2,2,0,0,0,0),15),31))
-Hepatitis.B.agegroup10$Intervention.2002<-factor(rep(c(rep(0,12*6),rep(1,12*9)),31))
-Hepatitis.B.agegroup10$Intervention.2009<-factor(rep(c(rep(0,12*4),rep(0,10),rep(1,2+12),rep(0,12*9)),31))
-Hepatitis.B.agegroup10$Interaction.2002<-rep(c(rep(0,6*12),c(0:(180-6*12-1))),31)
-Hepatitis.B.agegroup10$Interaction.2009<-rep(c(rep(0,4*12),rep(0,10),c(0:(2+12-1)),rep(0,9*12)),31)
-Hepatitis.B.agegroup10<-left_join(Hepatitis.B.agegroup10,Socio,by=c("Province","Year"))
-for(i in c(1:31))
-{sub.data<-Hepatitis.B.agegroup10[which(Hepatitis.B.agegroup10$Order==i),]
-mfirst<-gam(Case~ offset(log(Population.book))+Intervention.2002+Intervention.2009+
-              Time+Temperature+Bed+Urbanisation+Illiteracy+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
-              Holiday+Interaction.2002+Interaction.2009,#+Holiday+GDP+Birth_Rate
-            family=quasipoisson(link='log'), data=sub.data)
-mfirst<-model.matrix(mfirst)[,-1]
-Vif.values<-sapply(1:ncol(mfirst),function(i){
-  r.square<-summary(gam(mfirst[,i]~mfirst[,-i]),
-                    family=quasipoisson(link='log'),
-                    data=mfirst)$r.sq
-  1/(1-r.square)
-})
-names(Vif.values)<-colnames(mfirst)
-VIF[[5]][i,1]<-Vif.values[5]
-VIF[[5]][i,2]<-Vif.values[6]
-VIF[[5]][i,3]<-Vif.values[7]
-mfirst1<-gam(Case~ offset(log(Population.book))+Intervention.2002+Intervention.2009+Time+
-               Temperature+Bed+
-               #ns(Rain,df=4)+ns(Wind,df=4)+
-               #ns(Sunshine,df=4)+
-               Holiday+Interaction.2002+Interaction.2009,#+Holiday+GDP+Birth_Rate
-             family=quasipoisson(link='log'), data=sub.data)
-mfirst1<-model.matrix(mfirst1)[,-1]
-Vif.values<-sapply(1:ncol(mfirst1),function(i){
-  r.square<-summary(gam(mfirst1[,i]~mfirst1[,-i]),
-                    family=quasipoisson(link='log'),
-                    data=mfirst1)$r.sq
-  1/(1-r.square)
-})
-names(Vif.values)<-colnames(mfirst1)
-VIF[[5]][i,4]<-Vif.values[5]
-mfirst2<-gam(Case~ offset(log(Population.book))+Intervention.2002+Intervention.2009+Time+
-               Temperature+Urbanisation+
-               #ns(Rain,df=4)+ns(Wind,df=4)+
-               #ns(Sunshine,df=4)+
-               Holiday+Interaction.2002+Interaction.2009,#+Holiday+GDP+Birth_Rate
-             family=quasipoisson(link='log'), data=sub.data)
-mfirst2<-model.matrix(mfirst2)[,-1]
-Vif.values<-sapply(1:ncol(mfirst2),function(i){
-  r.square<-summary(gam(mfirst2[,i]~mfirst2[,-i]),
-                    family=quasipoisson(link='log'),
-                    data=mfirst2)$r.sq
-  1/(1-r.square)
-})
-names(Vif.values)<-colnames(mfirst2)
-VIF[[5]][i,5]<-Vif.values[5]
-#VIF[i,5]<-car::vif(mfirst2)[4,3]
-mfirst3<-gam(Case~ offset(log(Population.book))+Intervention.2002+Intervention.2009+Time+
-               Temperature+Illiteracy+
-               #ns(Rain,df=4)+ns(Wind,df=4)+
-               #ns(Sunshine,df=4)+
-               Holiday+Interaction.2002+Interaction.2009,#+Holiday+GDP+Birth_Rate
-             family=quasipoisson(link='log'), data=sub.data)
-mfirst3<-model.matrix(mfirst3)[,-1]
-Vif.values<-sapply(1:ncol(mfirst3),function(i){
-  r.square<-summary(gam(mfirst3[,i]~mfirst3[,-i]),
-                    family=quasipoisson(link='log'),
-                    data=mfirst3)$r.sq
-  1/(1-r.square)
-})
-names(Vif.values)<-colnames(mfirst3)
-VIF[[5]][i,6]<-Vif.values[5]
-}
-
-#Age group 11
-Hepatitis.B.agegroup11<-read.xlsx("agegroup11.xlsx")
-Hepatitis.B.agegroup11$Month.factor<-factor(Hepatitis.B.agegroup11$Month)
-Hepatitis.B.agegroup11$Time<-rep(c(0:179),31)
-Hepatitis.B.agegroup11$Holiday<-factor(rep(rep(c(1,1,0,0,0,0,2,2,0,0,0,0),15),31))
-Hepatitis.B.agegroup11$Intervention.2002<-factor(rep(c(rep(0,12*7),rep(1,12*8)),31))
-Hepatitis.B.agegroup11$Intervention.2009<-factor(rep(c(rep(0,12*4),rep(0,10),rep(1,2+2*12),rep(0,12*8)),31))
-Hepatitis.B.agegroup11$Interaction.2002<-rep(c(rep(0,7*12),c(0:(180-7*12-1))),31)
-Hepatitis.B.agegroup11$Interaction.2009<-rep(c(rep(0,4*12),rep(0,10),c(0:(2+2*12-1)),rep(0,8*12)),31)
-Hepatitis.B.agegroup11<-left_join(Hepatitis.B.agegroup11,Socio,by=c("Province","Year"))
-for(i in c(1:31))
-{sub.data<-Hepatitis.B.agegroup11[which(Hepatitis.B.agegroup11$Order==i),]
-mfirst<-gam(Case~ offset(log(Population.book))+Intervention.2002+Intervention.2009+
-              Time+Temperature+Bed+Urbanisation+Illiteracy+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
-              Holiday+Interaction.2002+Interaction.2009,#+Holiday+GDP+Birth_Rate
-            family=quasipoisson(link='log'), data=sub.data)
-mfirst<-model.matrix(mfirst)[,-1]
-Vif.values<-sapply(1:ncol(mfirst),function(i){
-  r.square<-summary(gam(mfirst[,i]~mfirst[,-i]),
-                    family=quasipoisson(link='log'),
-                    data=mfirst)$r.sq
-  1/(1-r.square)
-})
-names(Vif.values)<-colnames(mfirst)
-VIF[[6]][i,1]<-Vif.values[5]
-VIF[[6]][i,2]<-Vif.values[6]
-VIF[[6]][i,3]<-Vif.values[7]
-mfirst1<-gam(Case~ offset(log(Population.book))+Intervention.2002+Intervention.2009+Time+
-               Temperature+Bed+
-               #ns(Rain,df=4)+ns(Wind,df=4)+
-               #ns(Sunshine,df=4)+
-               Holiday+Interaction.2002+Interaction.2009,#+Holiday+GDP+Birth_Rate
-             family=quasipoisson(link='log'), data=sub.data)
-mfirst1<-model.matrix(mfirst1)[,-1]
-Vif.values<-sapply(1:ncol(mfirst1),function(i){
-  r.square<-summary(gam(mfirst1[,i]~mfirst1[,-i]),
-                    family=quasipoisson(link='log'),
-                    data=mfirst1)$r.sq
-  1/(1-r.square)
-})
-names(Vif.values)<-colnames(mfirst1)
-VIF[[6]][i,4]<-Vif.values[5]
-mfirst2<-gam(Case~ offset(log(Population.book))+Intervention.2002+Intervention.2009+Time+
-               Temperature+Urbanisation+
-               #ns(Rain,df=4)+ns(Wind,df=4)+
-               #ns(Sunshine,df=4)+
-               Holiday+Interaction.2002+Interaction.2009,#+Holiday+GDP+Birth_Rate
-             family=quasipoisson(link='log'), data=sub.data)
-mfirst2<-model.matrix(mfirst2)[,-1]
-Vif.values<-sapply(1:ncol(mfirst2),function(i){
-  r.square<-summary(gam(mfirst2[,i]~mfirst2[,-i]),
-                    family=quasipoisson(link='log'),
-                    data=mfirst2)$r.sq
-  1/(1-r.square)
-})
-names(Vif.values)<-colnames(mfirst2)
-VIF[[6]][i,5]<-Vif.values[5]
-#VIF[i,5]<-car::vif(mfirst2)[4,3]
-mfirst3<-gam(Case~ offset(log(Population.book))+Intervention.2002+Intervention.2009+Time+
-               Temperature+Illiteracy+
-               #ns(Rain,df=4)+ns(Wind,df=4)+
-               #ns(Sunshine,df=4)+
-               Holiday+Interaction.2002+Interaction.2009,#+Holiday+GDP+Birth_Rate
-             family=quasipoisson(link='log'), data=sub.data)
-mfirst3<-model.matrix(mfirst3)[,-1]
-Vif.values<-sapply(1:ncol(mfirst3),function(i){
-  r.square<-summary(gam(mfirst3[,i]~mfirst3[,-i]),
-                    family=quasipoisson(link='log'),
-                    data=mfirst3)$r.sq
-  1/(1-r.square)
-})
-names(Vif.values)<-colnames(mfirst3)
-VIF[[6]][i,6]<-Vif.values[5]
-}
-
-#Age group 12
-Hepatitis.B.agegroup12<-read.xlsx("agegroup12.xlsx")
-Hepatitis.B.agegroup12$Month.factor<-factor(Hepatitis.B.agegroup12$Month)
-Hepatitis.B.agegroup12$Time<-rep(c(0:179),31)
-Hepatitis.B.agegroup12$Holiday<-factor(rep(rep(c(1,1,0,0,0,0,2,2,0,0,0,0),15),31))
-Hepatitis.B.agegroup12$Intervention.2002<-factor(rep(c(rep(0,12*12),rep(1,12*3)),31))
-Hepatitis.B.agegroup12$Intervention.2009<-factor(rep(c(rep(0,12*4),rep(0,10),rep(1,2+7*12),rep(0,12*3)),31))
-Hepatitis.B.agegroup12$Interaction.2002<-rep(c(rep(0,12*12),c(0:(180-12*12-1))),31)
-Hepatitis.B.agegroup12$Interaction.2009<-rep(c(rep(0,4*12),rep(0,10),c(0:(2+7*12-1)),rep(0,3*12)),31)
-Hepatitis.B.agegroup12<-left_join(Hepatitis.B.agegroup12,Socio,by=c("Province","Year"))
-for(i in c(1:31))
-{sub.data<-Hepatitis.B.agegroup12[which(Hepatitis.B.agegroup12$Order==i),]
-mfirst<-gam(Case~ offset(log(Population.book))+Intervention.2002+Intervention.2009+
-              Time+Temperature+Bed+Urbanisation+Illiteracy+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
-              Holiday+Interaction.2002+Interaction.2009,#+Holiday+GDP+Birth_Rate
-            family=quasipoisson(link='log'), data=sub.data)
-mfirst<-model.matrix(mfirst)[,-1]
-Vif.values<-sapply(1:ncol(mfirst),function(i){
-  r.square<-summary(gam(mfirst[,i]~mfirst[,-i]),
-                    family=quasipoisson(link='log'),
-                    data=mfirst)$r.sq
-  1/(1-r.square)
-})
-names(Vif.values)<-colnames(mfirst)
-VIF[[7]][i,1]<-Vif.values[5]
-VIF[[7]][i,2]<-Vif.values[6]
-VIF[[7]][i,3]<-Vif.values[7]
-mfirst1<-gam(Case~ offset(log(Population.book))+Intervention.2002+Intervention.2009+Time+
-               Temperature+Bed+
-               #ns(Rain,df=4)+ns(Wind,df=4)+
-               #ns(Sunshine,df=4)+
-               Holiday+Interaction.2002+Interaction.2009,#+Holiday+GDP+Birth_Rate
-             family=quasipoisson(link='log'), data=sub.data)
-mfirst1<-model.matrix(mfirst1)[,-1]
-Vif.values<-sapply(1:ncol(mfirst1),function(i){
-  r.square<-summary(gam(mfirst1[,i]~mfirst1[,-i]),
-                    family=quasipoisson(link='log'),
-                    data=mfirst1)$r.sq
-  1/(1-r.square)
-})
-names(Vif.values)<-colnames(mfirst1)
-VIF[[7]][i,4]<-Vif.values[5]
-mfirst2<-gam(Case~ offset(log(Population.book))+Intervention.2002+Intervention.2009+Time+
-               Temperature+Urbanisation+
-               #ns(Rain,df=4)+ns(Wind,df=4)+
-               #ns(Sunshine,df=4)+
-               Holiday+Interaction.2002+Interaction.2009,#+Holiday+GDP+Birth_Rate
-             family=quasipoisson(link='log'), data=sub.data)
-mfirst2<-model.matrix(mfirst2)[,-1]
-Vif.values<-sapply(1:ncol(mfirst2),function(i){
-  r.square<-summary(gam(mfirst2[,i]~mfirst2[,-i]),
-                    family=quasipoisson(link='log'),
-                    data=mfirst2)$r.sq
-  1/(1-r.square)
-})
-names(Vif.values)<-colnames(mfirst2)
-VIF[[7]][i,5]<-Vif.values[5]
-#VIF[i,5]<-car::vif(mfirst2)[4,3]
-mfirst3<-gam(Case~ offset(log(Population.book))+Intervention.2002+Intervention.2009+Time+
-               Temperature+Illiteracy+
-               #ns(Rain,df=4)+ns(Wind,df=4)+
-               #ns(Sunshine,df=4)+
-               Holiday+Interaction.2002+Interaction.2009,#+Holiday+GDP+Birth_Rate
-             family=quasipoisson(link='log'), data=sub.data)
-mfirst3<-model.matrix(mfirst3)[,-1]
-Vif.values<-sapply(1:ncol(mfirst3),function(i){
-  r.square<-summary(gam(mfirst3[,i]~mfirst3[,-i]),
-                    family=quasipoisson(link='log'),
-                    data=mfirst3)$r.sq
-  1/(1-r.square)
-})
-names(Vif.values)<-colnames(mfirst3)
-VIF[[7]][i,6]<-Vif.values[5]
-}
-
-#Age group 13
-Hepatitis.B.agegroup13<-read.xlsx("Agegroup13.xlsx")
-Hepatitis.B.agegroup13$Month.factor<-factor(Hepatitis.B.agegroup13$Month)
-Hepatitis.B.agegroup13$Time<-rep(c(0:179),31)
-Hepatitis.B.agegroup13$Holiday<-factor(rep(rep(c(1,1,0,0,0,0,2,2,0,0,0,0),15),31))
-Hepatitis.B.agegroup13$Intervention.2009<-factor(rep(c(rep(0,9*12),rep(1,12*6)),31))
-Hepatitis.B.agegroup13$Interaction.2009<-rep(c(rep(0,9*12),c(0:(180-12*9-1))),31)
-Hepatitis.B.agegroup13<-left_join(Hepatitis.B.agegroup13,Socio,by=c("Province","Year"))
-for(i in c(1:31))
-{sub.data<-Hepatitis.B.agegroup13[which(Hepatitis.B.agegroup13$Order==i),]
-mfirst<-gam(Case~ offset(log(Population.book))+Intervention.2009+
-              Time+Temperature+Bed+Urbanisation+Illiteracy+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
-              Holiday+Interaction.2009,#+Holiday+GDP+Birth_Rate
-            family=quasipoisson(link='log'), data=sub.data)
-mfirst<-model.matrix(mfirst)[,-1]
-Vif.values<-sapply(1:ncol(mfirst),function(i){
-  r.square<-summary(gam(mfirst[,i]~mfirst[,-i]),
-                    family=quasipoisson(link='log'),
-                    data=mfirst)$r.sq
-  1/(1-r.square)
-})
-names(Vif.values)<-colnames(mfirst)
-VIF[[8]][i,1]<-Vif.values[4]
-VIF[[8]][i,2]<-Vif.values[5]
-VIF[[8]][i,3]<-Vif.values[6]
-mfirst1<-gam(Case~ offset(log(Population.book))+Intervention.2009+Time+
-               Temperature+Bed+
-               #ns(Rain,df=4)+ns(Wind,df=4)+
-               #ns(Sunshine,df=4)+
-               Holiday+Interaction.2009,#+Holiday+GDP+Birth_Rate
-             family=quasipoisson(link='log'), data=sub.data)
-mfirst1<-model.matrix(mfirst1)[,-1]
-Vif.values<-sapply(1:ncol(mfirst1),function(i){
-  r.square<-summary(gam(mfirst1[,i]~mfirst1[,-i]),
-                    family=quasipoisson(link='log'),
-                    data=mfirst1)$r.sq
-  1/(1-r.square)
-})
-names(Vif.values)<-colnames(mfirst1)
-VIF[[8]][i,4]<-Vif.values[4]
-mfirst2<-gam(Case~ offset(log(Population.book))+Intervention.2009+Time+
-               Temperature+Urbanisation+
-               #ns(Rain,df=4)+ns(Wind,df=4)+
-               #ns(Sunshine,df=4)+
-               Holiday+Interaction.2009,#+Holiday+GDP+Birth_Rate
-             family=quasipoisson(link='log'), data=sub.data)
-mfirst2<-model.matrix(mfirst2)[,-1]
-Vif.values<-sapply(1:ncol(mfirst2),function(i){
-  r.square<-summary(gam(mfirst2[,i]~mfirst2[,-i]),
-                    family=quasipoisson(link='log'),
-                    data=mfirst2)$r.sq
-  1/(1-r.square)
-})
-names(Vif.values)<-colnames(mfirst2)
-VIF[[8]][i,5]<-Vif.values[4]
-#VIF[i,5]<-car::vif(mfirst2)[4,3]
-mfirst3<-gam(Case~ offset(log(Population.book))+Intervention.2009+Time+
-               Temperature+Illiteracy+
-               #ns(Rain,df=4)+ns(Wind,df=4)+
-               #ns(Sunshine,df=4)+
-               Holiday+Interaction.2009,#+Holiday+GDP+Birth_Rate
-             family=quasipoisson(link='log'), data=sub.data)
-mfirst3<-model.matrix(mfirst3)[,-1]
-Vif.values<-sapply(1:ncol(mfirst3),function(i){
-  r.square<-summary(gam(mfirst3[,i]~mfirst3[,-i]),
-                    family=quasipoisson(link='log'),
-                    data=mfirst3)$r.sq
-  1/(1-r.square)
-})
-names(Vif.values)<-colnames(mfirst3)
-VIF[[8]][i,6]<-Vif.values[4]
-}
-
-#Age group 14
-Hepatitis.B.agegroup14<-read.xlsx("Agegroup14.xlsx")
-Hepatitis.B.agegroup14$Month.factor<-factor(Hepatitis.B.agegroup14$Month)
-Hepatitis.B.agegroup14$Time<-rep(c(0:179),31)
-Hepatitis.B.agegroup14$Holiday<-factor(rep(rep(c(1,1,0,0,0,0,2,2,0,0,0,0),15),31))
-Hepatitis.B.agegroup14$Intervention.2009<-factor(rep(c(rep(0,14*12),rep(1,12*1)),31))
-Hepatitis.B.agegroup14$Interaction.2009<-rep(c(rep(0,14*12),c(0:(180-12*14-1))),31)
-Hepatitis.B.agegroup14<-left_join(Hepatitis.B.agegroup14,Socio,by=c("Province","Year"))
-for(i in c(1:31))
-{sub.data<-Hepatitis.B.agegroup14[which(Hepatitis.B.agegroup14$Order==i),]
-mfirst<-gam(Case~ offset(log(Population.book))+Intervention.2009+
-              Time+Temperature+Bed+Urbanisation+Illiteracy+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
-              Holiday+Interaction.2009,#+Holiday+GDP+Birth_Rate
-            family=quasipoisson(link='log'), data=sub.data)
-mfirst<-model.matrix(mfirst)[,-1]
-Vif.values<-sapply(1:ncol(mfirst),function(i){
-  r.square<-summary(gam(mfirst[,i]~mfirst[,-i]),
-                    family=quasipoisson(link='log'),
-                    data=mfirst)$r.sq
-  1/(1-r.square)
-})
-names(Vif.values)<-colnames(mfirst)
-VIF[[9]][i,1]<-Vif.values[4]
-VIF[[9]][i,2]<-Vif.values[5]
-VIF[[9]][i,3]<-Vif.values[6]
-mfirst1<-gam(Case~ offset(log(Population.book))+Intervention.2009+Time+
-               Temperature+Bed+
-               #ns(Rain,df=4)+ns(Wind,df=4)+
-               #ns(Sunshine,df=4)+
-               Holiday+Interaction.2009,#+Holiday+GDP+Birth_Rate
-             family=quasipoisson(link='log'), data=sub.data)
-mfirst1<-model.matrix(mfirst1)[,-1]
-Vif.values<-sapply(1:ncol(mfirst1),function(i){
-  r.square<-summary(gam(mfirst1[,i]~mfirst1[,-i]),
-                    family=quasipoisson(link='log'),
-                    data=mfirst1)$r.sq
-  1/(1-r.square)
-})
-names(Vif.values)<-colnames(mfirst1)
-VIF[[9]][i,4]<-Vif.values[4]
-mfirst2<-gam(Case~ offset(log(Population.book))+Intervention.2009+Time+
-               Temperature+Urbanisation+
-               #ns(Rain,df=4)+ns(Wind,df=4)+
-               #ns(Sunshine,df=4)+
-               Holiday+Interaction.2009,#+Holiday+GDP+Birth_Rate
-             family=quasipoisson(link='log'), data=sub.data)
-mfirst2<-model.matrix(mfirst2)[,-1]
-Vif.values<-sapply(1:ncol(mfirst2),function(i){
-  r.square<-summary(gam(mfirst2[,i]~mfirst2[,-i]),
-                    family=quasipoisson(link='log'),
-                    data=mfirst2)$r.sq
-  1/(1-r.square)
-})
-names(Vif.values)<-colnames(mfirst2)
-VIF[[9]][i,5]<-Vif.values[4]
-#VIF[i,5]<-car::vif(mfirst2)[4,3]
-mfirst3<-gam(Case~ offset(log(Population.book))+Intervention.2009+Time+
-               Temperature+Illiteracy+
-               #ns(Rain,df=4)+ns(Wind,df=4)+
-               #ns(Sunshine,df=4)+
-               Holiday+Interaction.2009,#+Holiday+GDP+Birth_Rate
-             family=quasipoisson(link='log'), data=sub.data)
-mfirst3<-model.matrix(mfirst3)[,-1]
-Vif.values<-sapply(1:ncol(mfirst3),function(i){
-  r.square<-summary(gam(mfirst3[,i]~mfirst3[,-i]),
-                    family=quasipoisson(link='log'),
-                    data=mfirst3)$r.sq
-  1/(1-r.square)
-})
-names(Vif.values)<-colnames(mfirst3)
-VIF[[9]][i,6]<-Vif.values[4]
-}
-
-Vif.mean<-lapply(VIF,function(x){apply(x,2,mean)})
-Vif.mean<-as.data.frame(do.call(rbind,Vif.mean))
-Vif.mean<-round(Vif.mean,2)
-#write.xlsx(Vif.mean,file ="D:/研究生/乙肝干预/全国研究/二版结果/VIF update.xlsx")
-
-#######################Categorical socio-economic factors in models############
-#The interaction between categorical socio-economic factors and interventions
-#######################Beds####################################################
-Socio$Province<-as.factor(Socio$Province)
-Socio.split<-split(Socio,Socio$Province)
-Socio.class<-lapply(Socio.split,function(x){
-  Medians<-apply(x[,c(3:5)],2,median)
-  x$Bed.class<-ifelse(x$Bed>Medians[1],"1","0")
-  x$Urbanisation.class<-ifelse(x$Urbanisation>Medians[2],"1","0")
-  x$Illiteracy.class<-ifelse(x$Illiteracy>Medians[3],"1","0")
-  return(x)
-})
-Socio.class<-do.call(rbind,Socio.class)
-
-#Age group 6
-Hepatitis.B.agegroup6<-read.xlsx("agegroup6.xlsx")
-Hepatitis.B.agegroup6$Month.factor<-factor(Hepatitis.B.agegroup6$Month)
-Hepatitis.B.agegroup6$Time<-rep(c(0:179),31)
-Hepatitis.B.agegroup6$Holiday<-factor(rep(rep(c(1,1,0,0,0,0,2,2,0,0,0,0),15),31))
-Hepatitis.B.agegroup6$Intervention.2002<-factor(rep(c(rep(0,12*2),rep(1,13*12)),31))
-Hepatitis.B.agegroup6$Interaction.2002<-rep(c(rep(0,2*12),c(0:(180-2*12-1))),31)
-Hepatitis.B.agegroup6<-left_join(Hepatitis.B.agegroup6,Socio.class,by=c("Province","Year"))
-regions<-as.character(unique(Hepatitis.B.agegroup6$Province))
-datalist<-lapply(regions, function(x) Hepatitis.B.agegroup6[Hepatitis.B.agegroup6$Province==x, ])
-seq(datalist)
-yori2<-matrix(0, length(datalist), 1, dimnames=list(regions, "beta"))
-Sori2<-vector("list", length(datalist)); names(Sori2) <- regions
-for(i in c(1:31))
-{sub.data<-Hepatitis.B.agegroup6[which(Hepatitis.B.agegroup6$Order==i),]
-mfirst<-gam(Case~ offset(log(Population.book))+Intervention.2002+Time+
-              ns(Temperature,df=3)+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
-              Holiday+Interaction.2002+
-              Bed.class+Bed.class:Intervention.2002,#+Holiday+GDP+Birth_Rate
-            family=quasipoisson(link='log'), data=sub.data)
-lengthfun<-length(summary(mfirst)$p.coeff)
-yori2[i,] <- as.data.frame(summary(mfirst)$p.coeff)[lengthfun,1]
-Sori2[[i]] <- vcov(mfirst)[lengthfun,lengthfun]
-assign(paste("model2.",i,sep=""),mfirst)
-}
-which(yori2!=0)
-mvall2<-mvmeta(yori2[-c(1,2,6,9,26),]~1, Sori2[-c(1,2,6,9,26)], method="reml")
-summary(mvall2)
-
-#Age group 7
-Hepatitis.B.agegroup7<-read.xlsx("agegroup7.xlsx")
-Hepatitis.B.agegroup7$Month.factor<-factor(Hepatitis.B.agegroup7$Month)
-Hepatitis.B.agegroup7$Time<-rep(c(0:179),31)
-Hepatitis.B.agegroup7$Holiday<-factor(rep(rep(c(1,1,0,0,0,0,2,2,0,0,0,0),15),31))
-Hepatitis.B.agegroup7$Intervention.2002<-factor(rep(c(rep(0,12*3),rep(1,12*12)),31))
-Hepatitis.B.agegroup7$Interaction.2002<-rep(c(rep(0,3*12),c(0:(180-3*12-1))),31)
-Hepatitis.B.agegroup7<-left_join(Hepatitis.B.agegroup7,Socio.class,by=c("Province","Year"))
-regions<-as.character(unique(Hepatitis.B.agegroup7$Province))
-datalist<-lapply(regions, function(x) Hepatitis.B.agegroup7[Hepatitis.B.agegroup7$Province==x, ])
-seq(datalist)
-yori3<-matrix(0, length(datalist), 1, dimnames=list(regions, "beta"))
-Sori3<-vector("list", length(datalist)); names(Sori3) <- regions
-for(i in c(1:31))
-{sub.data<-Hepatitis.B.agegroup7[which(Hepatitis.B.agegroup7$Order==i),]
-mfirst<-gam(Case~ offset(log(Population.book))+Intervention.2002+Time+
-              ns(Temperature,df=3)+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
-              Holiday+Interaction.2002+
-              Bed.class+Bed.class:Intervention.2002,#+Holiday+GDP+Birth_Rate
-            family=quasipoisson(link='log'), data=sub.data)
-lengthfun<-length(summary(mfirst)$p.coeff)
-yori3[i,] <- as.data.frame(summary(mfirst)$p.coeff)[lengthfun,1]
-Sori3[[i]] <- vcov(mfirst)[lengthfun,lengthfun]
-assign(paste("model3.",i,sep=""),mfirst)
-}
-which(yori3!=0)
-mvall3<-mvmeta(yori3[-c(1,2,9,14,26),]~1, Sori3[-c(1,2,9,14,26)], method="reml")
-summary(mvall3)
-
-#Age group 8
-Hepatitis.B.agegroup8<-read.xlsx("agegroup8.xlsx")
-Hepatitis.B.agegroup8$Month.factor<-factor(Hepatitis.B.agegroup8$Month)
-Hepatitis.B.agegroup8$Time<-rep(c(0:179),31)
-Hepatitis.B.agegroup8$Holiday<-factor(rep(rep(c(1,1,0,0,0,0,2,2,0,0,0,0),15),31))
-Hepatitis.B.agegroup8$Intervention.2002<-factor(rep(c(rep(0,12*4),rep(1,12*11)),31))
-Hepatitis.B.agegroup8$Interaction.2002<-rep(c(rep(0,4*12),c(0:(180-4*12-1))),31)
-Hepatitis.B.agegroup8<-left_join(Hepatitis.B.agegroup8,Socio.class,by=c("Province","Year"))
-regions<-as.character(unique(Hepatitis.B.agegroup8$Province))
-datalist<-lapply(regions, function(x) Hepatitis.B.agegroup8[Hepatitis.B.agegroup8$Province==x, ])
-seq(datalist)
-yori4<-matrix(0, length(datalist), 1, dimnames=list(regions, "beta"))
-Sori4<-vector("list", length(datalist)); names(Sori4) <- regions
-for(i in c(1:31))
-{sub.data<-Hepatitis.B.agegroup8[which(Hepatitis.B.agegroup8$Order==i),]
-mfirst<-gam(Case~ offset(log(Population.book))+Intervention.2002+Time+
-              ns(Temperature,df=3)+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
-              Holiday+Interaction.2002+
-              Bed.class+Bed.class:Intervention.2002,#+Holiday+GDP+Birth_Rate
-            family=quasipoisson(link='log'), data=sub.data)
-lengthfun<-length(summary(mfirst)$p.coeff)
-yori4[i,] <- as.data.frame(summary(mfirst)$p.coeff)[lengthfun,1]
-Sori4[[i]] <- vcov(mfirst)[lengthfun,lengthfun]
-assign(paste("model4.",i,sep=""),mfirst)
-}
-which(yori4!=0)
-mvall4<-mvmeta(yori4[-c(1,2,9,14,26),]~1, Sori4[-c(1,2,9,14,26)], method="reml")
-summary(mvall4)
-
-#Age group 9
-Hepatitis.B.agegroup9<-read.xlsx("agegroup9.xlsx")
-Hepatitis.B.agegroup9$Month.factor<-factor(Hepatitis.B.agegroup9$Month)
-Hepatitis.B.agegroup9$Time<-rep(c(0:179),31)
-Hepatitis.B.agegroup9$Holiday<-factor(rep(rep(c(1,1,0,0,0,0,2,2,0,0,0,0),15),31))
-Hepatitis.B.agegroup9$Intervention.2002<-factor(rep(c(rep(0,12*5),rep(1,12*10)),31))
-Hepatitis.B.agegroup9$Intervention.2009<-factor(rep(c(rep(0,12*4),rep(0,10),rep(1,2),rep(0,12*10)),31))
-Hepatitis.B.agegroup9$Interaction.2002<-rep(c(rep(0,5*12),c(0:(180-5*12-1))),31)
-Hepatitis.B.agegroup9$Interaction.2009<-rep(c(rep(0,4*12),rep(0,10),c(0:(2-1)),rep(0,10*12)),31)
-Hepatitis.B.agegroup9<-left_join(Hepatitis.B.agegroup9,Socio.class,by=c("Province","Year"))
-regions<-as.character(unique(Hepatitis.B.agegroup9$Province))
-datalist<-lapply(regions, function(x) Hepatitis.B.agegroup9[Hepatitis.B.agegroup9$Province==x, ])
-seq(datalist)
-yori5.1<-matrix(0, length(datalist), 1, dimnames=list(regions, "beta"))
-Sori5.1<-vector("list", length(datalist)); names(Sori5.1) <- regions
-yori5.2<-matrix(0, length(datalist), 1, dimnames=list(regions, "beta"))
-Sori5.2<-vector("list", length(datalist)); names(Sori5.2) <- regions
-for(i in c(1:31))
-{sub.data<-Hepatitis.B.agegroup9[which(Hepatitis.B.agegroup9$Order==i),]
-mfirst<-gam(Case~ offset(log(Population.book))+Intervention.2002+Intervention.2009+
-              Interaction.2002+Interaction.2009+
-              Time+ns(Temperature,df=3)+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
-              Holiday+Bed.class+Interaction.2002:Bed.class+Interaction.2009:Bed.class,#+Holiday+GDP+Birth_Rate
-            family=quasipoisson(link='log'), data=sub.data)
-lengthfun<-length(summary(mfirst)$p.coeff)
-yori5.1[i,] <- as.data.frame(summary(mfirst)$p.coeff)[lengthfun-1,1]
-Sori5.1[[i]] <- vcov(mfirst)[lengthfun-1,lengthfun-1]
-yori5.2[i,] <- as.data.frame(summary(mfirst)$p.coeff)[lengthfun,1]
-Sori5.2[[i]] <- vcov(mfirst)[lengthfun,lengthfun]
-assign(paste("model5.",i,sep=""),mfirst)
-}
-which(yori5.1!=0)
-mvall5.1<-mvmeta(yori5.1[-c(1,2,9,14,26),]~1, Sori5.1[-c(1,2,9,14,26)], method="reml")
-summary(mvall5.1)
-which(yori5.2!=0)
-mvall5.2<-mvmeta(yori5.2[-c(1,2,5,9,11,12,14,15,21,25,26),]~1, Sori5.2[-c(1,2,5,9,11,12,14,15,21,25,26)], method="reml")
-summary(mvall5.2)
-
-#Age group 10
-Hepatitis.B.agegroup10<-read.xlsx("agegroup10.xlsx")
-Hepatitis.B.agegroup10$Month.factor<-factor(Hepatitis.B.agegroup10$Month)
-Hepatitis.B.agegroup10$Time<-rep(c(0:179),31)
-Hepatitis.B.agegroup10$Holiday<-factor(rep(rep(c(1,1,0,0,0,0,2,2,0,0,0,0),15),31))
-Hepatitis.B.agegroup10$Intervention.2002<-factor(rep(c(rep(0,12*6),rep(1,12*9)),31))
-Hepatitis.B.agegroup10$Intervention.2009<-factor(rep(c(rep(0,12*4),rep(0,10),rep(1,2+12),rep(0,12*9)),31))
-Hepatitis.B.agegroup10$Interaction.2002<-rep(c(rep(0,6*12),c(0:(180-6*12-1))),31)
-Hepatitis.B.agegroup10$Interaction.2009<-rep(c(rep(0,4*12),rep(0,10),c(0:(2+12-1)),rep(0,9*12)),31)
-Hepatitis.B.agegroup10<-left_join(Hepatitis.B.agegroup10,Socio.class,by=c("Province","Year"))
-regions<-as.character(unique(Hepatitis.B.agegroup10$Province))
-datalist<-lapply(regions, function(x) Hepatitis.B.agegroup10[Hepatitis.B.agegroup10$Province==x, ])
-seq(datalist)
-yori6.1<-matrix(0, length(datalist), 1, dimnames=list(regions, "beta"))
-Sori6.1<-vector("list", length(datalist)); names(Sori6.1) <- regions
-yori6.2<-matrix(0, length(datalist), 1, dimnames=list(regions, "beta"))
-Sori6.2<-vector("list", length(datalist)); names(Sori6.2) <- regions
-for(i in c(1:31))
-{sub.data<-Hepatitis.B.agegroup10[which(Hepatitis.B.agegroup10$Order==i),]
-mfirst<-gam(Case~ offset(log(Population.book))+Intervention.2002+Intervention.2009+
-              Interaction.2002+Interaction.2009+
-              Time+ns(Temperature,df=3)+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
-              Holiday+Bed.class+Interaction.2002:Bed.class+Interaction.2009:Bed.class,#+Holiday+GDP+Birth_Rate
-            family=quasipoisson(link='log'), data=sub.data)
-lengthfun<-length(summary(mfirst)$p.coeff)
-yori6.1[i,] <- as.data.frame(summary(mfirst)$p.coeff)[lengthfun-1,1]
-Sori6.1[[i]] <- vcov(mfirst)[lengthfun-1,lengthfun-1]
-yori6.2[i,] <- as.data.frame(summary(mfirst)$p.coeff)[lengthfun,1]
-Sori6.2[[i]] <- vcov(mfirst)[lengthfun,lengthfun]
-assign(paste("model6.",i,sep=""),mfirst)
-}
-which(yori6.1!=0)
-mvall6.1<-mvmeta(yori6.1[-c(1,2,9,14,26),]~1, Sori6.1[-c(1,2,9,14,26)], method="reml")
-summary(mvall6.1)
-which(yori6.2!=0)
-mvall6.2<-mvmeta(yori6.2[-c(1,2,9,14,26),]~1, Sori6.2[-c(1,2,9,14,26)], method="reml")
-summary(mvall6.2)
-
-#Age group 11
-Hepatitis.B.agegroup11<-read.xlsx("agegroup11.xlsx")
-Hepatitis.B.agegroup11$Month.factor<-factor(Hepatitis.B.agegroup11$Month)
-Hepatitis.B.agegroup11$Time<-rep(c(0:179),31)
-Hepatitis.B.agegroup11$Holiday<-factor(rep(rep(c(1,1,0,0,0,0,2,2,0,0,0,0),15),31))
-Hepatitis.B.agegroup11$Intervention.2002<-factor(rep(c(rep(0,12*7),rep(1,12*8)),31))
-Hepatitis.B.agegroup11$Intervention.2009<-factor(rep(c(rep(0,12*4),rep(0,10),rep(1,2+2*12),rep(0,12*8)),31))
-Hepatitis.B.agegroup11$Interaction.2002<-rep(c(rep(0,7*12),c(0:(180-7*12-1))),31)
-Hepatitis.B.agegroup11$Interaction.2009<-rep(c(rep(0,4*12),rep(0,10),c(0:(2+2*12-1)),rep(0,8*12)),31)
-Hepatitis.B.agegroup11<-left_join(Hepatitis.B.agegroup11,Socio.class,by=c("Province","Year"))
-regions<-as.character(unique(Hepatitis.B.agegroup11$Province))
-datalist<-lapply(regions, function(x) Hepatitis.B.agegroup11[Hepatitis.B.agegroup11$Province==x, ])
-seq(datalist)
-yori7.1<-matrix(0, length(datalist), 1, dimnames=list(regions, "beta"))
-Sori7.1<-vector("list", length(datalist)); names(Sori7.1) <- regions
-yori7.2<-matrix(0, length(datalist), 1, dimnames=list(regions, "beta"))
-Sori7.2<-vector("list", length(datalist)); names(Sori7.2) <- regions
-for(i in c(1:31))
-{sub.data<-Hepatitis.B.agegroup11[which(Hepatitis.B.agegroup11$Order==i),]
-mfirst<-gam(Case~ offset(log(Population.book))+Intervention.2002+Intervention.2009+
-              Interaction.2002+Interaction.2009+
-              Time+ns(Temperature,df=3)+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
-              Holiday+Bed.class+Interaction.2002:Bed.class+Interaction.2009:Bed.class,#+Holiday+GDP+Birth_Rate
-            family=quasipoisson(link='log'), data=sub.data)
-lengthfun<-length(summary(mfirst)$p.coeff)
-yori7.1[i,] <- as.data.frame(summary(mfirst)$p.coeff)[lengthfun-1,1]
-Sori7.1[[i]] <- vcov(mfirst)[lengthfun-1,lengthfun-1]
-yori7.2[i,] <- as.data.frame(summary(mfirst)$p.coeff)[lengthfun,1]
-Sori7.2[[i]] <- vcov(mfirst)[lengthfun,lengthfun]
-assign(paste("model7.",i,sep=""),mfirst)
-}
-which(yori7.1!=0)
-mvall7.1<-mvmeta(yori7.1~1, Sori7.1, method="reml")
-summary(mvall7.1)
-which(yori7.2!=0)
-mvall7.2<-mvmeta(yori7.2~1, Sori7.2, method="reml")
-summary(mvall7.2)
-
-#Age group 12
-Hepatitis.B.agegroup12<-read.xlsx("agegroup12.xlsx")
-Hepatitis.B.agegroup12$Month.factor<-factor(Hepatitis.B.agegroup12$Month)
-Hepatitis.B.agegroup12$Time<-rep(c(0:179),31)
-Hepatitis.B.agegroup12$Holiday<-factor(rep(rep(c(1,1,0,0,0,0,2,2,0,0,0,0),15),31))
-Hepatitis.B.agegroup12$Intervention.2002<-factor(rep(c(rep(0,12*12),rep(1,12*3)),31))
-Hepatitis.B.agegroup12$Intervention.2009<-factor(rep(c(rep(0,12*4),rep(0,10),rep(1,2+7*12),rep(0,12*3)),31))
-Hepatitis.B.agegroup12$Interaction.2002<-rep(c(rep(0,12*12),c(0:(180-12*12-1))),31)
-Hepatitis.B.agegroup12$Interaction.2009<-rep(c(rep(0,4*12),rep(0,10),c(0:(2+7*12-1)),rep(0,3*12)),31)
-Hepatitis.B.agegroup12<-left_join(Hepatitis.B.agegroup12,Socio.class,by=c("Province","Year"))
-regions<-as.character(unique(Hepatitis.B.agegroup12$Province))
-datalist<-lapply(regions, function(x) Hepatitis.B.agegroup12[Hepatitis.B.agegroup12$Province==x, ])
-seq(datalist)
-yori8.1<-matrix(0, length(datalist), 1, dimnames=list(regions, "beta"))
-Sori8.1<-vector("list", length(datalist)); names(Sori8.1) <- regions
-yori8.2<-matrix(0, length(datalist), 1, dimnames=list(regions, "beta"))
-Sori8.2<-vector("list", length(datalist)); names(Sori8.2) <- regions
-for(i in c(1:31))
-{sub.data<-Hepatitis.B.agegroup12[which(Hepatitis.B.agegroup12$Order==i),]
-mfirst<-gam(Case~ offset(log(Population.book))+Intervention.2002+Intervention.2009+
-              Interaction.2002+Interaction.2009+
-              Time+ns(Temperature,df=3)+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
-              Holiday+Bed.class+Interaction.2002:Bed.class+Interaction.2009:Bed.class,#+Holiday+GDP+Birth_Rate
-            family=quasipoisson(link='log'), data=sub.data)
-lengthfun<-length(summary(mfirst)$p.coeff)
-yori8.1[i,] <- as.data.frame(summary(mfirst)$p.coeff)[lengthfun-1,1]
-Sori8.1[[i]] <- vcov(mfirst)[lengthfun-1,lengthfun-1]
-yori8.2[i,] <- as.data.frame(summary(mfirst)$p.coeff)[lengthfun,1]
-Sori8.2[[i]] <- vcov(mfirst)[lengthfun,lengthfun]
-assign(paste("model8.",i,sep=""),mfirst)
-}
-which(yori8.1!=0)
-mvall8.1<-mvmeta(yori8.1~1, Sori8.1, method="reml")
-summary(mvall8.1)
-which(yori8.2!=0)
-mvall8.2<-mvmeta(yori8.2~1, Sori8.2, method="reml")
-summary(mvall8.2)
-
-#Age group 13
-Hepatitis.B.agegroup13<-read.xlsx("Agegroup13.xlsx")
-Hepatitis.B.agegroup13$Month.factor<-factor(Hepatitis.B.agegroup13$Month)
-Hepatitis.B.agegroup13$Time<-rep(c(0:179),31)
-Hepatitis.B.agegroup13$Holiday<-factor(rep(rep(c(1,1,0,0,0,0,2,2,0,0,0,0),15),31))
-Hepatitis.B.agegroup13$Intervention.2009<-factor(rep(c(rep(0,9*12),rep(1,12*6)),31))
-Hepatitis.B.agegroup13$Interaction.2009<-rep(c(rep(0,9*12),c(0:(180-12*9-1))),31)
-Hepatitis.B.agegroup13<-left_join(Hepatitis.B.agegroup13,Socio.class,by=c("Province","Year"))
-regions<-as.character(unique(Hepatitis.B.agegroup13$Province))
-datalist<-lapply(regions, function(x) Hepatitis.B.agegroup13[Hepatitis.B.agegroup13$Province==x, ])
-seq(datalist)
-yori9<-matrix(0, length(datalist), 1, dimnames=list(regions, "beta"))
-Sori9<-vector("list", length(datalist)); names(Sori9) <- regions
-for(i in c(1:31))
-{sub.data<-Hepatitis.B.agegroup13[which(Hepatitis.B.agegroup13$Order==i),]
-mfirst<-gam(Case~ offset(log(Population.book))+Intervention.2009+Interaction.2009+
-              Time+ns(Temperature,df=3)+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
-              Holiday+Bed.class+Bed.class:Interaction.2009,#+Holiday+GDP+Birth_Rate
-            family=quasipoisson(link='log'), data=sub.data)
-lengthfun<-length(summary(mfirst)$p.coeff)
-yori9[i,] <- as.data.frame(summary(mfirst)$p.coeff)[lengthfun,1]
-Sori9[[i]] <- vcov(mfirst)[lengthfun,lengthfun]
-assign(paste("model9.",i,sep=""),mfirst)
-}
-which(yori8.1!=0)
-mvall9<-mvmeta(yori9~1, Sori9, method="reml")
-summary(mvall9)
-
-#Age group 14
-Hepatitis.B.agegroup14<-read.xlsx("Agegroup14.xlsx")
-Hepatitis.B.agegroup14$Month.factor<-factor(Hepatitis.B.agegroup14$Month)
-Hepatitis.B.agegroup14$Time<-rep(c(0:179),31)
-Hepatitis.B.agegroup14$Holiday<-factor(rep(rep(c(1,1,0,0,0,0,2,2,0,0,0,0),15),31))
-Hepatitis.B.agegroup14$Intervention.2009<-factor(rep(c(rep(0,14*12),rep(1,12*1)),31))
-Hepatitis.B.agegroup14$Interaction.2009<-rep(c(rep(0,14*12),c(0:(180-12*14-1))),31)
-Hepatitis.B.agegroup14<-left_join(Hepatitis.B.agegroup14,Socio.class,by=c("Province","Year"))
-regions<-as.character(unique(Hepatitis.B.agegroup14$Province))
-datalist<-lapply(regions, function(x) Hepatitis.B.agegroup14[Hepatitis.B.agegroup14$Province==x, ])
-seq(datalist)
-yori10<-matrix(0, length(datalist), 1, dimnames=list(regions, "beta"))
-Sori10<-vector("list", length(datalist)); names(Sori10) <- regions
-for(i in c(1:31))
-{sub.data<-Hepatitis.B.agegroup14[which(Hepatitis.B.agegroup14$Order==i),]
-mfirst<-gam(Case~ offset(log(Population.book))+Intervention.2009+Interaction.2009+
-              Time+ns(Temperature,df=3)+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
-              Holiday+Bed.class+Bed.class:Interaction.2009,#+Holiday+GDP+Birth_Rate
-            family=quasipoisson(link='log'), data=sub.data)
-lengthfun<-length(summary(mfirst)$p.coeff)
-yori10[i,] <- as.data.frame(summary(mfirst)$p.coeff)[lengthfun,1]
-Sori10[[i]] <- vcov(mfirst)[lengthfun,lengthfun]
-assign(paste("model10.",i,sep=""),mfirst)
-}
-which(yori10!=0)
-mvall10<-mvmeta(yori10~1, Sori10, method="reml")
-summary(mvall10)
-
-#######################Urbanisation rates####################################################
-#Age group 6
-Hepatitis.B.agegroup6<-read.xlsx("agegroup6.xlsx")
-Hepatitis.B.agegroup6$Month.factor<-factor(Hepatitis.B.agegroup6$Month)
-Hepatitis.B.agegroup6$Time<-rep(c(0:179),31)
-Hepatitis.B.agegroup6$Holiday<-factor(rep(rep(c(1,1,0,0,0,0,2,2,0,0,0,0),15),31))
-Hepatitis.B.agegroup6$Intervention.2002<-factor(rep(c(rep(0,12*2),rep(1,13*12)),31))
-Hepatitis.B.agegroup6$Interaction.2002<-rep(c(rep(0,2*12),c(0:(180-2*12-1))),31)
-Hepatitis.B.agegroup6<-left_join(Hepatitis.B.agegroup6,Socio.class,by=c("Province","Year"))
-regions<-as.character(unique(Hepatitis.B.agegroup6$Province))
-datalist<-lapply(regions, function(x) Hepatitis.B.agegroup6[Hepatitis.B.agegroup6$Province==x, ])
-seq(datalist)
-yori2<-matrix(0, length(datalist), 1, dimnames=list(regions, "beta"))
-Sori2<-vector("list", length(datalist)); names(Sori2) <- regions
-for(i in c(1:31))
-{sub.data<-Hepatitis.B.agegroup6[which(Hepatitis.B.agegroup6$Order==i),]
-mfirst<-gam(Case~ offset(log(Population.book))+Intervention.2002+Time+
-              ns(Temperature,df=3)+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
-              Holiday+Interaction.2002+
-              Urbanisation.class+Urbanisation.class:Intervention.2002,#+Holiday+GDP+Birth_Rate
-            family=quasipoisson(link='log'), data=sub.data)
-lengthfun<-length(summary(mfirst)$p.coeff)
-yori2[i,] <- as.data.frame(summary(mfirst)$p.coeff)[lengthfun,1]
-Sori2[[i]] <- vcov(mfirst)[lengthfun,lengthfun]
-assign(paste("model2.",i,sep=""),mfirst)
-}
-which(yori2!=0)
-mvall2<-mvmeta(yori2[-c(1,2,6,9,26),]~1, Sori2[-c(1,2,6,9,26)], method="reml")
-summary(mvall2)
-
-#Age group 7
-Hepatitis.B.agegroup7<-read.xlsx("agegroup7.xlsx")
-Hepatitis.B.agegroup7$Month.factor<-factor(Hepatitis.B.agegroup7$Month)
-Hepatitis.B.agegroup7$Time<-rep(c(0:179),31)
-Hepatitis.B.agegroup7$Holiday<-factor(rep(rep(c(1,1,0,0,0,0,2,2,0,0,0,0),15),31))
-Hepatitis.B.agegroup7$Intervention.2002<-factor(rep(c(rep(0,12*3),rep(1,12*12)),31))
-Hepatitis.B.agegroup7$Interaction.2002<-rep(c(rep(0,3*12),c(0:(180-3*12-1))),31)
-Hepatitis.B.agegroup7<-left_join(Hepatitis.B.agegroup7,Socio.class,by=c("Province","Year"))
-regions<-as.character(unique(Hepatitis.B.agegroup7$Province))
-datalist<-lapply(regions, function(x) Hepatitis.B.agegroup7[Hepatitis.B.agegroup7$Province==x, ])
-seq(datalist)
-yori3<-matrix(0, length(datalist), 1, dimnames=list(regions, "beta"))
-Sori3<-vector("list", length(datalist)); names(Sori3) <- regions
-for(i in c(1:31))
-{sub.data<-Hepatitis.B.agegroup7[which(Hepatitis.B.agegroup7$Order==i),]
-mfirst<-gam(Case~ offset(log(Population.book))+Intervention.2002+Time+
-              ns(Temperature,df=3)+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
-              Holiday+Interaction.2002+
-              Urbanisation.class+Urbanisation.class:Intervention.2002,#+Holiday+GDP+Birth_Rate
-            family=quasipoisson(link='log'), data=sub.data)
-lengthfun<-length(summary(mfirst)$p.coeff)
-yori3[i,] <- as.data.frame(summary(mfirst)$p.coeff)[lengthfun,1]
-Sori3[[i]] <- vcov(mfirst)[lengthfun,lengthfun]
-assign(paste("model3.",i,sep=""),mfirst)
-}
-which(yori3!=0)
-mvall3<-mvmeta(yori3[-c(1,2,9,14,26),]~1, Sori3[-c(1,2,9,14,26)], method="reml")
-summary(mvall3)
-
-#Age group 8
-Hepatitis.B.agegroup8<-read.xlsx("agegroup8.xlsx")
-Hepatitis.B.agegroup8$Month.factor<-factor(Hepatitis.B.agegroup8$Month)
-Hepatitis.B.agegroup8$Time<-rep(c(0:179),31)
-Hepatitis.B.agegroup8$Holiday<-factor(rep(rep(c(1,1,0,0,0,0,2,2,0,0,0,0),15),31))
-Hepatitis.B.agegroup8$Intervention.2002<-factor(rep(c(rep(0,12*4),rep(1,12*11)),31))
-Hepatitis.B.agegroup8$Interaction.2002<-rep(c(rep(0,4*12),c(0:(180-4*12-1))),31)
-Hepatitis.B.agegroup8<-left_join(Hepatitis.B.agegroup8,Socio.class,by=c("Province","Year"))
-regions<-as.character(unique(Hepatitis.B.agegroup8$Province))
-datalist<-lapply(regions, function(x) Hepatitis.B.agegroup8[Hepatitis.B.agegroup8$Province==x, ])
-seq(datalist)
-yori4<-matrix(0, length(datalist), 1, dimnames=list(regions, "beta"))
-Sori4<-vector("list", length(datalist)); names(Sori4) <- regions
-for(i in c(1:31))
-{sub.data<-Hepatitis.B.agegroup8[which(Hepatitis.B.agegroup8$Order==i),]
-mfirst<-gam(Case~ offset(log(Population.book))+Intervention.2002+Time+
-              ns(Temperature,df=3)+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
-              Holiday+Interaction.2002+
-              Urbanisation.class+Urbanisation.class:Intervention.2002,#+Holiday+GDP+Birth_Rate
-            family=quasipoisson(link='log'), data=sub.data)
-lengthfun<-length(summary(mfirst)$p.coeff)
-yori4[i,] <- as.data.frame(summary(mfirst)$p.coeff)[lengthfun,1]
-Sori4[[i]] <- vcov(mfirst)[lengthfun,lengthfun]
-assign(paste("model4.",i,sep=""),mfirst)
-}
-which(yori4!=0)
-mvall4<-mvmeta(yori4[-c(1,2,9,14,26),]~1, Sori4[-c(1,2,9,14,26)], method="reml")
-summary(mvall4)
-
-#Age group 9
-Hepatitis.B.agegroup9<-read.xlsx("agegroup9.xlsx")
-Hepatitis.B.agegroup9$Month.factor<-factor(Hepatitis.B.agegroup9$Month)
-Hepatitis.B.agegroup9$Time<-rep(c(0:179),31)
-Hepatitis.B.agegroup9$Holiday<-factor(rep(rep(c(1,1,0,0,0,0,2,2,0,0,0,0),15),31))
-Hepatitis.B.agegroup9$Intervention.2002<-factor(rep(c(rep(0,12*5),rep(1,12*10)),31))
-Hepatitis.B.agegroup9$Intervention.2009<-factor(rep(c(rep(0,12*4),rep(0,10),rep(1,2),rep(0,12*10)),31))
-Hepatitis.B.agegroup9$Interaction.2002<-rep(c(rep(0,5*12),c(0:(180-5*12-1))),31)
-#Hepatitis.B.agegroup9$Interaction.2009<-rep(c(rep(0,4*12),c(0:(1*12-1)),rep(0,10*12)),31)
-Hepatitis.B.agegroup9$Interaction.2009<-rep(c(rep(0,4*12),rep(0,10),c(0:(2-1)),rep(0,10*12)),31)
-Hepatitis.B.agegroup9<-left_join(Hepatitis.B.agegroup9,Socio.class,by=c("Province","Year"))
-regions<-as.character(unique(Hepatitis.B.agegroup9$Province))
-datalist<-lapply(regions, function(x) Hepatitis.B.agegroup9[Hepatitis.B.agegroup9$Province==x, ])
-seq(datalist)
-yori5.1<-matrix(0, length(datalist), 1, dimnames=list(regions, "beta"))
-Sori5.1<-vector("list", length(datalist)); names(Sori5.1) <- regions
-yori5.2<-matrix(0, length(datalist), 1, dimnames=list(regions, "beta"))
-Sori5.2<-vector("list", length(datalist)); names(Sori5.2) <- regions
-for(i in c(1:31))
-{sub.data<-Hepatitis.B.agegroup9[which(Hepatitis.B.agegroup9$Order==i),]
-mfirst<-gam(Case~ offset(log(Population.book))+Intervention.2002+Intervention.2009+
-              Interaction.2002+Interaction.2009+
-              Time+ns(Temperature,df=3)+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
-              Holiday+Urbanisation.class+Interaction.2002:Urbanisation.class+Interaction.2009:Urbanisation.class,#+Holiday+GDP+Birth_Rate
-            family=quasipoisson(link='log'), data=sub.data)
-lengthfun<-length(summary(mfirst)$p.coeff)
-yori5.1[i,] <- as.data.frame(summary(mfirst)$p.coeff)[lengthfun-1,1]
-Sori5.1[[i]] <- vcov(mfirst)[lengthfun-1,lengthfun-1]
-yori5.2[i,] <- as.data.frame(summary(mfirst)$p.coeff)[lengthfun,1]
-Sori5.2[[i]] <- vcov(mfirst)[lengthfun,lengthfun]
-assign(paste("model5.",i,sep=""),mfirst)
-}
-which(yori5.1!=0)
-mvall5.1<-mvmeta(yori5.1[-c(1,2,9,14,26),]~1, Sori5.1[-c(1,2,9,14,26)], method="reml")
-summary(mvall5.1)
-which(yori5.2!=0)
-mvall5.2<-mvmeta(yori5.2[-c(1,2,5,9,11,12,14,15,21,25,26),]~1, Sori5.2[-c(1,2,5,9,11,12,14,15,21,25,26)], method="reml")
-summary(mvall5.2)
-
-#Age group 10
-Hepatitis.B.agegroup10<-read.xlsx("agegroup10.xlsx")
-Hepatitis.B.agegroup10$Month.factor<-factor(Hepatitis.B.agegroup10$Month)
-Hepatitis.B.agegroup10$Time<-rep(c(0:179),31)
-Hepatitis.B.agegroup10$Holiday<-factor(rep(rep(c(1,1,0,0,0,0,2,2,0,0,0,0),15),31))
-Hepatitis.B.agegroup10$Intervention.2002<-factor(rep(c(rep(0,12*6),rep(1,12*9)),31))
-Hepatitis.B.agegroup10$Intervention.2009<-factor(rep(c(rep(0,12*4),rep(0,10),rep(1,2+12),rep(0,12*9)),31))
-Hepatitis.B.agegroup10$Interaction.2002<-rep(c(rep(0,6*12),c(0:(180-6*12-1))),31)
-Hepatitis.B.agegroup10$Interaction.2009<-rep(c(rep(0,4*12),rep(0,10),c(0:(2+12-1)),rep(0,9*12)),31)
-Hepatitis.B.agegroup10<-left_join(Hepatitis.B.agegroup10,Socio.class,by=c("Province","Year"))
-regions<-as.character(unique(Hepatitis.B.agegroup10$Province))
-datalist<-lapply(regions, function(x) Hepatitis.B.agegroup10[Hepatitis.B.agegroup10$Province==x, ])
-seq(datalist)
-yori6.1<-matrix(0, length(datalist), 1, dimnames=list(regions, "beta"))
-Sori6.1<-vector("list", length(datalist)); names(Sori6.1) <- regions
-yori6.2<-matrix(0, length(datalist), 1, dimnames=list(regions, "beta"))
-Sori6.2<-vector("list", length(datalist)); names(Sori6.2) <- regions
-for(i in c(1:31))
-{sub.data<-Hepatitis.B.agegroup10[which(Hepatitis.B.agegroup10$Order==i),]
-mfirst<-gam(Case~ offset(log(Population.book))+Intervention.2002+Intervention.2009+
-              Interaction.2002+Interaction.2009+
-              Time+ns(Temperature,df=3)+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
-              Holiday+Urbanisation.class+Interaction.2002:Urbanisation.class+Interaction.2009:Urbanisation.class,#+Holiday+GDP+Birth_Rate
-            family=quasipoisson(link='log'), data=sub.data)
-lengthfun<-length(summary(mfirst)$p.coeff)
-yori6.1[i,] <- as.data.frame(summary(mfirst)$p.coeff)[lengthfun-1,1]
-Sori6.1[[i]] <- vcov(mfirst)[lengthfun-1,lengthfun-1]
-yori6.2[i,] <- as.data.frame(summary(mfirst)$p.coeff)[lengthfun,1]
-Sori6.2[[i]] <- vcov(mfirst)[lengthfun,lengthfun]
-assign(paste("model6.",i,sep=""),mfirst)
-}
-which(yori6.1!=0)
-mvall6.1<-mvmeta(yori6.1[-c(1,2,9,14,26),]~1, Sori6.1[-c(1,2,9,14,26)], method="reml")
-summary(mvall6.1)
-which(yori6.2!=0)
-mvall6.2<-mvmeta(yori6.2[-c(1,2,9,14,26),]~1, Sori6.2[-c(1,2,9,14,26)], method="reml")
-summary(mvall6.2)
-
-#Age group 11
-Hepatitis.B.agegroup11<-read.xlsx("agegroup11.xlsx")
-Hepatitis.B.agegroup11$Month.factor<-factor(Hepatitis.B.agegroup11$Month)
-Hepatitis.B.agegroup11$Time<-rep(c(0:179),31)
-Hepatitis.B.agegroup11$Holiday<-factor(rep(rep(c(1,1,0,0,0,0,2,2,0,0,0,0),15),31))
-Hepatitis.B.agegroup11$Intervention.2002<-factor(rep(c(rep(0,12*7),rep(1,12*8)),31))
-Hepatitis.B.agegroup11$Intervention.2009<-factor(rep(c(rep(0,12*4),rep(0,10),rep(1,2+2*12),rep(0,12*8)),31))
-Hepatitis.B.agegroup11$Interaction.2002<-rep(c(rep(0,7*12),c(0:(180-7*12-1))),31)
-Hepatitis.B.agegroup11$Interaction.2009<-rep(c(rep(0,4*12),rep(0,10),c(0:(2+2*12-1)),rep(0,8*12)),31)
-Hepatitis.B.agegroup11<-left_join(Hepatitis.B.agegroup11,Socio.class,by=c("Province","Year"))
-regions<-as.character(unique(Hepatitis.B.agegroup11$Province))
-datalist<-lapply(regions, function(x) Hepatitis.B.agegroup11[Hepatitis.B.agegroup11$Province==x, ])
-seq(datalist)
-yori7.1<-matrix(0, length(datalist), 1, dimnames=list(regions, "beta"))
-Sori7.1<-vector("list", length(datalist)); names(Sori7.1) <- regions
-yori7.2<-matrix(0, length(datalist), 1, dimnames=list(regions, "beta"))
-Sori7.2<-vector("list", length(datalist)); names(Sori7.2) <- regions
-for(i in c(1:31))
-{sub.data<-Hepatitis.B.agegroup11[which(Hepatitis.B.agegroup11$Order==i),]
-mfirst<-gam(Case~ offset(log(Population.book))+Intervention.2002+Intervention.2009+
-              Interaction.2002+Interaction.2009+
-              Time+ns(Temperature,df=3)+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
-              Holiday+Urbanisation.class+Interaction.2002:Urbanisation.class+Interaction.2009:Urbanisation.class,#+Holiday+GDP+Birth_Rate
-            family=quasipoisson(link='log'), data=sub.data)
-lengthfun<-length(summary(mfirst)$p.coeff)
-yori7.1[i,] <- as.data.frame(summary(mfirst)$p.coeff)[lengthfun-1,1]
-Sori7.1[[i]] <- vcov(mfirst)[lengthfun-1,lengthfun-1]
-yori7.2[i,] <- as.data.frame(summary(mfirst)$p.coeff)[lengthfun,1]
-Sori7.2[[i]] <- vcov(mfirst)[lengthfun,lengthfun]
-assign(paste("model7.",i,sep=""),mfirst)
-}
-which(yori7.1!=0)
-mvall7.1<-mvmeta(yori7.1~1, Sori7.1, method="reml")
-summary(mvall7.1)
-which(yori7.2!=0)
-mvall7.2<-mvmeta(yori7.2~1, Sori7.2, method="reml")
-summary(mvall7.2)
-
-#Age group 12
-Hepatitis.B.agegroup12<-read.xlsx("agegroup12.xlsx")
-Hepatitis.B.agegroup12$Month.factor<-factor(Hepatitis.B.agegroup12$Month)
-Hepatitis.B.agegroup12$Time<-rep(c(0:179),31)
-Hepatitis.B.agegroup12$Holiday<-factor(rep(rep(c(1,1,0,0,0,0,2,2,0,0,0,0),15),31))
-Hepatitis.B.agegroup12$Intervention.2002<-factor(rep(c(rep(0,12*12),rep(1,12*3)),31))
-Hepatitis.B.agegroup12$Intervention.2009<-factor(rep(c(rep(0,12*4),rep(0,10),rep(1,2+7*12),rep(0,12*3)),31))
-Hepatitis.B.agegroup12$Interaction.2002<-rep(c(rep(0,12*12),c(0:(180-12*12-1))),31)
-Hepatitis.B.agegroup12$Interaction.2009<-rep(c(rep(0,4*12),rep(0,10),c(0:(2+7*12-1)),rep(0,3*12)),31)
-Hepatitis.B.agegroup12<-left_join(Hepatitis.B.agegroup12,Socio.class,by=c("Province","Year"))
-regions<-as.character(unique(Hepatitis.B.agegroup12$Province))
-datalist<-lapply(regions, function(x) Hepatitis.B.agegroup12[Hepatitis.B.agegroup12$Province==x, ])
-seq(datalist)
-yori8.1<-matrix(0, length(datalist), 1, dimnames=list(regions, "beta"))
-Sori8.1<-vector("list", length(datalist)); names(Sori8.1) <- regions
-yori8.2<-matrix(0, length(datalist), 1, dimnames=list(regions, "beta"))
-Sori8.2<-vector("list", length(datalist)); names(Sori8.2) <- regions
-for(i in c(1:31))
-{sub.data<-Hepatitis.B.agegroup12[which(Hepatitis.B.agegroup12$Order==i),]
-mfirst<-gam(Case~ offset(log(Population.book))+Intervention.2002+Intervention.2009+
-              Interaction.2002+Interaction.2009+
-              Time+ns(Temperature,df=3)+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
-              Holiday+Urbanisation.class+Interaction.2002:Urbanisation.class+Interaction.2009:Urbanisation.class,#+Holiday+GDP+Birth_Rate
-            family=quasipoisson(link='log'), data=sub.data)
-lengthfun<-length(summary(mfirst)$p.coeff)
-yori8.1[i,] <- as.data.frame(summary(mfirst)$p.coeff)[lengthfun-1,1]
-Sori8.1[[i]] <- vcov(mfirst)[lengthfun-1,lengthfun-1]
-yori8.2[i,] <- as.data.frame(summary(mfirst)$p.coeff)[lengthfun,1]
-Sori8.2[[i]] <- vcov(mfirst)[lengthfun,lengthfun]
-assign(paste("model8.",i,sep=""),mfirst)
-}
-which(yori8.1!=0)
-mvall8.1<-mvmeta(yori8.1~1, Sori8.1, method="reml")
-summary(mvall8.1)
-which(yori8.2!=0)
-mvall8.2<-mvmeta(yori8.2~1, Sori8.2, method="reml")
-summary(mvall8.2)
-
-#Age group 13
-Hepatitis.B.agegroup13<-read.xlsx("Agegroup13.xlsx")
-Hepatitis.B.agegroup13$Month.factor<-factor(Hepatitis.B.agegroup13$Month)
-Hepatitis.B.agegroup13$Time<-rep(c(0:179),31)
-Hepatitis.B.agegroup13$Holiday<-factor(rep(rep(c(1,1,0,0,0,0,2,2,0,0,0,0),15),31))
-Hepatitis.B.agegroup13$Intervention.2009<-factor(rep(c(rep(0,9*12),rep(1,12*6)),31))
-Hepatitis.B.agegroup13$Interaction.2009<-rep(c(rep(0,9*12),c(0:(180-12*9-1))),31)
-Hepatitis.B.agegroup13<-left_join(Hepatitis.B.agegroup13,Socio.class,by=c("Province","Year"))
-regions<-as.character(unique(Hepatitis.B.agegroup13$Province))
-datalist<-lapply(regions, function(x) Hepatitis.B.agegroup13[Hepatitis.B.agegroup13$Province==x, ])
-seq(datalist)
-yori9<-matrix(0, length(datalist), 1, dimnames=list(regions, "beta"))
-Sori9<-vector("list", length(datalist)); names(Sori9) <- regions
-for(i in c(1:31))
-{sub.data<-Hepatitis.B.agegroup13[which(Hepatitis.B.agegroup13$Order==i),]
-mfirst<-gam(Case~ offset(log(Population.book))+Intervention.2009+Interaction.2009+
-              Time+ns(Temperature,df=3)+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
-              Holiday+Urbanisation.class+Urbanisation.class:Interaction.2009,#+Holiday+GDP+Birth_Rate
-            family=quasipoisson(link='log'), data=sub.data)
-lengthfun<-length(summary(mfirst)$p.coeff)
-yori9[i,] <- as.data.frame(summary(mfirst)$p.coeff)[lengthfun,1]
-Sori9[[i]] <- vcov(mfirst)[lengthfun,lengthfun]
-assign(paste("model9.",i,sep=""),mfirst)
-}
-which(yori8.1!=0)
-mvall9<-mvmeta(yori9~1, Sori9, method="reml")
-summary(mvall9)
-
-#Age group 14
-Hepatitis.B.agegroup14<-read.xlsx("Agegroup14.xlsx")
-Hepatitis.B.agegroup14$Month.factor<-factor(Hepatitis.B.agegroup14$Month)
-Hepatitis.B.agegroup14$Time<-rep(c(0:179),31)
-Hepatitis.B.agegroup14$Holiday<-factor(rep(rep(c(1,1,0,0,0,0,2,2,0,0,0,0),15),31))
-Hepatitis.B.agegroup14$Intervention.2009<-factor(rep(c(rep(0,14*12),rep(1,12*1)),31))
-Hepatitis.B.agegroup14$Interaction.2009<-rep(c(rep(0,14*12),c(0:(180-12*14-1))),31)
-Hepatitis.B.agegroup14<-left_join(Hepatitis.B.agegroup14,Socio.class,by=c("Province","Year"))
-regions<-as.character(unique(Hepatitis.B.agegroup14$Province))
-datalist<-lapply(regions, function(x) Hepatitis.B.agegroup14[Hepatitis.B.agegroup14$Province==x, ])
-seq(datalist)
-yori10<-matrix(0, length(datalist), 1, dimnames=list(regions, "beta"))
-Sori10<-vector("list", length(datalist)); names(Sori10) <- regions
-for(i in c(1:31))
-{sub.data<-Hepatitis.B.agegroup14[which(Hepatitis.B.agegroup14$Order==i),]
-mfirst<-gam(Case~ offset(log(Population.book))+Intervention.2009+Interaction.2009+
-              Time+ns(Temperature,df=3)+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
-              Holiday+Urbanisation.class+Urbanisation.class:Interaction.2009,#+Holiday+GDP+Birth_Rate
-            family=quasipoisson(link='log'), data=sub.data)
-lengthfun<-length(summary(mfirst)$p.coeff)
-yori10[i,] <- as.data.frame(summary(mfirst)$p.coeff)[lengthfun,1]
-Sori10[[i]] <- vcov(mfirst)[lengthfun,lengthfun]
-assign(paste("model10.",i,sep=""),mfirst)
-}
-which(yori10!=0)
-mvall10<-mvmeta(yori10~1, Sori10, method="reml")
-summary(mvall10)
-
-#######################Illiteracy rates####################################################
-#Age group 6
-Hepatitis.B.agegroup6<-read.xlsx("agegroup6.xlsx")
-Hepatitis.B.agegroup6$Month.factor<-factor(Hepatitis.B.agegroup6$Month)
-Hepatitis.B.agegroup6$Time<-rep(c(0:179),31)
-Hepatitis.B.agegroup6$Holiday<-factor(rep(rep(c(1,1,0,0,0,0,2,2,0,0,0,0),15),31))
-Hepatitis.B.agegroup6$Intervention.2002<-factor(rep(c(rep(0,12*2),rep(1,13*12)),31))
-Hepatitis.B.agegroup6$Interaction.2002<-rep(c(rep(0,2*12),c(0:(180-2*12-1))),31)
-Hepatitis.B.agegroup6<-left_join(Hepatitis.B.agegroup6,Socio.class,by=c("Province","Year"))
-regions<-as.character(unique(Hepatitis.B.agegroup6$Province))
-datalist<-lapply(regions, function(x) Hepatitis.B.agegroup6[Hepatitis.B.agegroup6$Province==x, ])
-seq(datalist)
-yori2<-matrix(0, length(datalist), 1, dimnames=list(regions, "beta"))
-Sori2<-vector("list", length(datalist)); names(Sori2) <- regions
-for(i in c(1:31))
-{sub.data<-Hepatitis.B.agegroup6[which(Hepatitis.B.agegroup6$Order==i),]
-mfirst<-gam(Case~ offset(log(Population.book))+Intervention.2002+Time+
-              ns(Temperature,df=3)+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
-              Holiday+Interaction.2002+
-              Illiteracy.class+Illiteracy.class:Intervention.2002,#+Holiday+GDP+Birth_Rate
-            family=quasipoisson(link='log'), data=sub.data)
-lengthfun<-length(summary(mfirst)$p.coeff)
-yori2[i,] <- as.data.frame(summary(mfirst)$p.coeff)[lengthfun,1]
-Sori2[[i]] <- vcov(mfirst)[lengthfun,lengthfun]
-assign(paste("model2.",i,sep=""),mfirst)
-}
-which(yori2!=0)
-mvall2<-mvmeta(yori2[-c(1,2,6,9,26),]~1, Sori2[-c(1,2,6,9,26)], method="reml")
-summary(mvall2)
-
-#Age group 7
-Hepatitis.B.agegroup7<-read.xlsx("agegroup7.xlsx")
-Hepatitis.B.agegroup7$Month.factor<-factor(Hepatitis.B.agegroup7$Month)
-Hepatitis.B.agegroup7$Time<-rep(c(0:179),31)
-Hepatitis.B.agegroup7$Holiday<-factor(rep(rep(c(1,1,0,0,0,0,2,2,0,0,0,0),15),31))
-Hepatitis.B.agegroup7$Intervention.2002<-factor(rep(c(rep(0,12*3),rep(1,12*12)),31))
-Hepatitis.B.agegroup7$Interaction.2002<-rep(c(rep(0,3*12),c(0:(180-3*12-1))),31)
-Hepatitis.B.agegroup7<-left_join(Hepatitis.B.agegroup7,Socio.class,by=c("Province","Year"))
-regions<-as.character(unique(Hepatitis.B.agegroup7$Province))
-datalist<-lapply(regions, function(x) Hepatitis.B.agegroup7[Hepatitis.B.agegroup7$Province==x, ])
-seq(datalist)
-yori3<-matrix(0, length(datalist), 1, dimnames=list(regions, "beta"))
-Sori3<-vector("list", length(datalist)); names(Sori3) <- regions
-for(i in c(1:31))
-{sub.data<-Hepatitis.B.agegroup7[which(Hepatitis.B.agegroup7$Order==i),]
-mfirst<-gam(Case~ offset(log(Population.book))+Intervention.2002+Time+
-              ns(Temperature,df=3)+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
-              Holiday+Interaction.2002+
-              Illiteracy.class+Illiteracy.class:Intervention.2002,#+Holiday+GDP+Birth_Rate
-            family=quasipoisson(link='log'), data=sub.data)
-lengthfun<-length(summary(mfirst)$p.coeff)
-yori3[i,] <- as.data.frame(summary(mfirst)$p.coeff)[lengthfun,1]
-Sori3[[i]] <- vcov(mfirst)[lengthfun,lengthfun]
-assign(paste("model3.",i,sep=""),mfirst)
-}
-which(yori3!=0)
-mvall3<-mvmeta(yori3[-c(1,2,9,14,26),]~1, Sori3[-c(1,2,9,14,26)], method="reml")
-summary(mvall3)
-
-#Age group 8
-Hepatitis.B.agegroup8<-read.xlsx("agegroup8.xlsx")
-Hepatitis.B.agegroup8$Month.factor<-factor(Hepatitis.B.agegroup8$Month)
-Hepatitis.B.agegroup8$Time<-rep(c(0:179),31)
-Hepatitis.B.agegroup8$Holiday<-factor(rep(rep(c(1,1,0,0,0,0,2,2,0,0,0,0),15),31))
-Hepatitis.B.agegroup8$Intervention.2002<-factor(rep(c(rep(0,12*4),rep(1,12*11)),31))
-Hepatitis.B.agegroup8$Interaction.2002<-rep(c(rep(0,4*12),c(0:(180-4*12-1))),31)
-Hepatitis.B.agegroup8<-left_join(Hepatitis.B.agegroup8,Socio.class,by=c("Province","Year"))
-regions<-as.character(unique(Hepatitis.B.agegroup8$Province))
-datalist<-lapply(regions, function(x) Hepatitis.B.agegroup8[Hepatitis.B.agegroup8$Province==x, ])
-seq(datalist)
-yori4<-matrix(0, length(datalist), 1, dimnames=list(regions, "beta"))
-Sori4<-vector("list", length(datalist)); names(Sori4) <- regions
-for(i in c(1:31))
-{sub.data<-Hepatitis.B.agegroup8[which(Hepatitis.B.agegroup8$Order==i),]
-mfirst<-gam(Case~ offset(log(Population.book))+Intervention.2002+Time+
-              ns(Temperature,df=3)+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
-              Holiday+Interaction.2002+
-              Illiteracy.class+Illiteracy.class:Intervention.2002,#+Holiday+GDP+Birth_Rate
-            family=quasipoisson(link='log'), data=sub.data)
-lengthfun<-length(summary(mfirst)$p.coeff)
-yori4[i,] <- as.data.frame(summary(mfirst)$p.coeff)[lengthfun,1]
-Sori4[[i]] <- vcov(mfirst)[lengthfun,lengthfun]
-assign(paste("model4.",i,sep=""),mfirst)
-}
-which(yori4!=0)
-mvall4<-mvmeta(yori4[-c(1,2,9,14,26),]~1, Sori4[-c(1,2,9,14,26)], method="reml")
-summary(mvall4)
-
-#Age group 9
-Hepatitis.B.agegroup9<-read.xlsx("agegroup9.xlsx")
-Hepatitis.B.agegroup9$Month.factor<-factor(Hepatitis.B.agegroup9$Month)
-Hepatitis.B.agegroup9$Time<-rep(c(0:179),31)
-Hepatitis.B.agegroup9$Holiday<-factor(rep(rep(c(1,1,0,0,0,0,2,2,0,0,0,0),15),31))
-Hepatitis.B.agegroup9$Intervention.2002<-factor(rep(c(rep(0,12*5),rep(1,12*10)),31))
-Hepatitis.B.agegroup9$Intervention.2009<-factor(rep(c(rep(0,12*4),rep(0,10),rep(1,2),rep(0,12*10)),31))
-Hepatitis.B.agegroup9$Interaction.2002<-rep(c(rep(0,5*12),c(0:(180-5*12-1))),31)
-Hepatitis.B.agegroup9$Interaction.2009<-rep(c(rep(0,4*12),rep(0,10),c(0:(2-1)),rep(0,10*12)),31)
-Hepatitis.B.agegroup9<-left_join(Hepatitis.B.agegroup9,Socio.class,by=c("Province","Year"))
-regions<-as.character(unique(Hepatitis.B.agegroup9$Province))
-datalist<-lapply(regions, function(x) Hepatitis.B.agegroup9[Hepatitis.B.agegroup9$Province==x, ])
-seq(datalist)
-yori5.1<-matrix(0, length(datalist), 1, dimnames=list(regions, "beta"))
-Sori5.1<-vector("list", length(datalist)); names(Sori5.1) <- regions
-yori5.2<-matrix(0, length(datalist), 1, dimnames=list(regions, "beta"))
-Sori5.2<-vector("list", length(datalist)); names(Sori5.2) <- regions
-for(i in c(1:31))
-{sub.data<-Hepatitis.B.agegroup9[which(Hepatitis.B.agegroup9$Order==i),]
-mfirst<-gam(Case~ offset(log(Population.book))+Intervention.2002+Intervention.2009+
-              Interaction.2002+Interaction.2009+
-              Time+ns(Temperature,df=3)+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
-              Holiday+Illiteracy.class+Interaction.2002:Illiteracy.class+Interaction.2009:Illiteracy.class,#+Holiday+GDP+Birth_Rate
-            family=quasipoisson(link='log'), data=sub.data)
-lengthfun<-length(summary(mfirst)$p.coeff)
-yori5.1[i,] <- as.data.frame(summary(mfirst)$p.coeff)[lengthfun-1,1]
-Sori5.1[[i]] <- vcov(mfirst)[lengthfun-1,lengthfun-1]
-yori5.2[i,] <- as.data.frame(summary(mfirst)$p.coeff)[lengthfun,1]
-Sori5.2[[i]] <- vcov(mfirst)[lengthfun,lengthfun]
-assign(paste("model5.",i,sep=""),mfirst)
-}
-which(yori5.1!=0)
-mvall5.1<-mvmeta(yori5.1[-c(1,2,9,14,26),]~1, Sori5.1[-c(1,2,9,14,26)], method="reml")
-summary(mvall5.1)
-which(yori5.2!=0)
-mvall5.2<-mvmeta(yori5.2[-c(1,2,5,9,11,12,14,15,21,25,26),]~1, Sori5.2[-c(1,2,5,9,11,12,14,15,21,25,26)], method="reml")
-summary(mvall5.2)
-
-#Age group 10
-Hepatitis.B.agegroup10<-read.xlsx("agegroup10.xlsx")
-Hepatitis.B.agegroup10$Month.factor<-factor(Hepatitis.B.agegroup10$Month)
-Hepatitis.B.agegroup10$Time<-rep(c(0:179),31)
-Hepatitis.B.agegroup10$Holiday<-factor(rep(rep(c(1,1,0,0,0,0,2,2,0,0,0,0),15),31))
-Hepatitis.B.agegroup10$Intervention.2002<-factor(rep(c(rep(0,12*6),rep(1,12*9)),31))
-Hepatitis.B.agegroup10$Intervention.2009<-factor(rep(c(rep(0,12*4),rep(0,10),rep(1,2+12),rep(0,12*9)),31))
-Hepatitis.B.agegroup10$Interaction.2002<-rep(c(rep(0,6*12),c(0:(180-6*12-1))),31)
-Hepatitis.B.agegroup10$Interaction.2009<-rep(c(rep(0,4*12),rep(0,10),c(0:(2+12-1)),rep(0,9*12)),31)
-Hepatitis.B.agegroup10<-left_join(Hepatitis.B.agegroup10,Socio.class,by=c("Province","Year"))
-regions<-as.character(unique(Hepatitis.B.agegroup10$Province))
-datalist<-lapply(regions, function(x) Hepatitis.B.agegroup10[Hepatitis.B.agegroup10$Province==x, ])
-seq(datalist)
-yori6.1<-matrix(0, length(datalist), 1, dimnames=list(regions, "beta"))
-Sori6.1<-vector("list", length(datalist)); names(Sori6.1) <- regions
-yori6.2<-matrix(0, length(datalist), 1, dimnames=list(regions, "beta"))
-Sori6.2<-vector("list", length(datalist)); names(Sori6.2) <- regions
-for(i in c(1:31))
-{sub.data<-Hepatitis.B.agegroup10[which(Hepatitis.B.agegroup10$Order==i),]
-mfirst<-gam(Case~ offset(log(Population.book))+Intervention.2002+Intervention.2009+
-              Interaction.2002+Interaction.2009+
-              Time+ns(Temperature,df=3)+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
-              Holiday+Illiteracy.class+Interaction.2002:Illiteracy.class+Interaction.2009:Illiteracy.class,#+Holiday+GDP+Birth_Rate
-            family=quasipoisson(link='log'), data=sub.data)
-lengthfun<-length(summary(mfirst)$p.coeff)
-yori6.1[i,] <- as.data.frame(summary(mfirst)$p.coeff)[lengthfun-1,1]
-Sori6.1[[i]] <- vcov(mfirst)[lengthfun-1,lengthfun-1]
-yori6.2[i,] <- as.data.frame(summary(mfirst)$p.coeff)[lengthfun,1]
-Sori6.2[[i]] <- vcov(mfirst)[lengthfun,lengthfun]
-assign(paste("model6.",i,sep=""),mfirst)
-}
-which(yori6.1!=0)
-mvall6.1<-mvmeta(yori6.1[-c(1,2,9,14,26),]~1, Sori6.1[-c(1,2,9,14,26)], method="reml")
-summary(mvall6.1)
-which(yori6.2!=0)
-mvall6.2<-mvmeta(yori6.2[-c(1,2,9,14,26),]~1, Sori6.2[-c(1,2,9,14,26)], method="reml")
-summary(mvall6.2)
-
-#Age group 11
-Hepatitis.B.agegroup11<-read.xlsx("agegroup11.xlsx")
-Hepatitis.B.agegroup11$Month.factor<-factor(Hepatitis.B.agegroup11$Month)
-Hepatitis.B.agegroup11$Time<-rep(c(0:179),31)
-Hepatitis.B.agegroup11$Holiday<-factor(rep(rep(c(1,1,0,0,0,0,2,2,0,0,0,0),15),31))
-Hepatitis.B.agegroup11$Intervention.2002<-factor(rep(c(rep(0,12*7),rep(1,12*8)),31))
-Hepatitis.B.agegroup11$Intervention.2009<-factor(rep(c(rep(0,12*4),rep(0,10),rep(1,2+2*12),rep(0,12*8)),31))
-Hepatitis.B.agegroup11$Interaction.2002<-rep(c(rep(0,7*12),c(0:(180-7*12-1))),31)
-Hepatitis.B.agegroup11$Interaction.2009<-rep(c(rep(0,4*12),rep(0,10),c(0:(2+2*12-1)),rep(0,8*12)),31)
-Hepatitis.B.agegroup11<-left_join(Hepatitis.B.agegroup11,Socio.class,by=c("Province","Year"))
-regions<-as.character(unique(Hepatitis.B.agegroup11$Province))
-datalist<-lapply(regions, function(x) Hepatitis.B.agegroup11[Hepatitis.B.agegroup11$Province==x, ])
-seq(datalist)
-yori7.1<-matrix(0, length(datalist), 1, dimnames=list(regions, "beta"))
-Sori7.1<-vector("list", length(datalist)); names(Sori7.1) <- regions
-yori7.2<-matrix(0, length(datalist), 1, dimnames=list(regions, "beta"))
-Sori7.2<-vector("list", length(datalist)); names(Sori7.2) <- regions
-for(i in c(1:31))
-{sub.data<-Hepatitis.B.agegroup11[which(Hepatitis.B.agegroup11$Order==i),]
-mfirst<-gam(Case~ offset(log(Population.book))+Intervention.2002+Intervention.2009+
-              Interaction.2002+Interaction.2009+
-              Time+ns(Temperature,df=3)+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
-              Holiday+Illiteracy.class+Interaction.2002:Illiteracy.class+Interaction.2009:Illiteracy.class,#+Holiday+GDP+Birth_Rate
-            family=quasipoisson(link='log'), data=sub.data)
-lengthfun<-length(summary(mfirst)$p.coeff)
-yori7.1[i,] <- as.data.frame(summary(mfirst)$p.coeff)[lengthfun-1,1]
-Sori7.1[[i]] <- vcov(mfirst)[lengthfun-1,lengthfun-1]
-yori7.2[i,] <- as.data.frame(summary(mfirst)$p.coeff)[lengthfun,1]
-Sori7.2[[i]] <- vcov(mfirst)[lengthfun,lengthfun]
-assign(paste("model7.",i,sep=""),mfirst)
-}
-which(yori7.1!=0)
-mvall7.1<-mvmeta(yori7.1~1, Sori7.1, method="reml")
-summary(mvall7.1)
-which(yori7.2!=0)
-mvall7.2<-mvmeta(yori7.2~1, Sori7.2, method="reml")
-summary(mvall7.2)
-
-#Age group 12
-Hepatitis.B.agegroup12<-read.xlsx("agegroup12.xlsx")
-Hepatitis.B.agegroup12$Month.factor<-factor(Hepatitis.B.agegroup12$Month)
-Hepatitis.B.agegroup12$Time<-rep(c(0:179),31)
-Hepatitis.B.agegroup12$Holiday<-factor(rep(rep(c(1,1,0,0,0,0,2,2,0,0,0,0),15),31))
-Hepatitis.B.agegroup12$Intervention.2002<-factor(rep(c(rep(0,12*12),rep(1,12*3)),31))
-Hepatitis.B.agegroup12$Intervention.2009<-factor(rep(c(rep(0,12*4),rep(0,10),rep(1,2+7*12),rep(0,12*3)),31))
-Hepatitis.B.agegroup12$Interaction.2002<-rep(c(rep(0,12*12),c(0:(180-12*12-1))),31)
-Hepatitis.B.agegroup12$Interaction.2009<-rep(c(rep(0,4*12),rep(0,10),c(0:(2+7*12-1)),rep(0,3*12)),31)
-Hepatitis.B.agegroup12<-left_join(Hepatitis.B.agegroup12,Socio.class,by=c("Province","Year"))
-regions<-as.character(unique(Hepatitis.B.agegroup12$Province))
-datalist<-lapply(regions, function(x) Hepatitis.B.agegroup12[Hepatitis.B.agegroup12$Province==x, ])
-seq(datalist)
-yori8.1<-matrix(0, length(datalist), 1, dimnames=list(regions, "beta"))
-Sori8.1<-vector("list", length(datalist)); names(Sori8.1) <- regions
-yori8.2<-matrix(0, length(datalist), 1, dimnames=list(regions, "beta"))
-Sori8.2<-vector("list", length(datalist)); names(Sori8.2) <- regions
-for(i in c(1:31))
-{sub.data<-Hepatitis.B.agegroup12[which(Hepatitis.B.agegroup12$Order==i),]
-mfirst<-gam(Case~ offset(log(Population.book))+Intervention.2002+Intervention.2009+
-              Interaction.2002+Interaction.2009+
-              Time+ns(Temperature,df=3)+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
-              Holiday+Illiteracy.class+Interaction.2002:Illiteracy.class+Interaction.2009:Illiteracy.class,#+Holiday+GDP+Birth_Rate
-            family=quasipoisson(link='log'), data=sub.data)
-lengthfun<-length(summary(mfirst)$p.coeff)
-yori8.1[i,] <- as.data.frame(summary(mfirst)$p.coeff)[lengthfun-1,1]
-Sori8.1[[i]] <- vcov(mfirst)[lengthfun-1,lengthfun-1]
-yori8.2[i,] <- as.data.frame(summary(mfirst)$p.coeff)[lengthfun,1]
-Sori8.2[[i]] <- vcov(mfirst)[lengthfun,lengthfun]
-assign(paste("model8.",i,sep=""),mfirst)
-}
-which(yori8.1!=0)
-mvall8.1<-mvmeta(yori8.1~1, Sori8.1, method="reml")
-summary(mvall8.1)
-which(yori8.2!=0)
-mvall8.2<-mvmeta(yori8.2~1, Sori8.2, method="reml")
-summary(mvall8.2)
-
-#Age group 13
-setwd("D:/研究生/乙肝干预/全国研究")
-Hepatitis.B.agegroup13<-read.xlsx("Agegroup13.xlsx")
-Hepatitis.B.agegroup13$Month.factor<-factor(Hepatitis.B.agegroup13$Month)
-Hepatitis.B.agegroup13$Time<-rep(c(0:179),31)
-Hepatitis.B.agegroup13$Holiday<-factor(rep(rep(c(1,1,0,0,0,0,2,2,0,0,0,0),15),31))
-Hepatitis.B.agegroup13$Intervention.2009<-factor(rep(c(rep(0,9*12),rep(1,12*6)),31))
-Hepatitis.B.agegroup13$Interaction.2009<-rep(c(rep(0,9*12),c(0:(180-12*9-1))),31)
-Hepatitis.B.agegroup13<-left_join(Hepatitis.B.agegroup13,Socio.class,by=c("Province","Year"))
-regions<-as.character(unique(Hepatitis.B.agegroup13$Province))
-datalist<-lapply(regions, function(x) Hepatitis.B.agegroup13[Hepatitis.B.agegroup13$Province==x, ])
-seq(datalist)
-yori9<-matrix(0, length(datalist), 1, dimnames=list(regions, "beta"))
-Sori9<-vector("list", length(datalist)); names(Sori9) <- regions
-for(i in c(1:31))
-{sub.data<-Hepatitis.B.agegroup13[which(Hepatitis.B.agegroup13$Order==i),]
-mfirst<-gam(Case~ offset(log(Population.book))+Intervention.2009+Interaction.2009+
-              Time+ns(Temperature,df=3)+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
-              Holiday+Illiteracy.class+Illiteracy.class:Interaction.2009,#+Holiday+GDP+Birth_Rate
-            family=quasipoisson(link='log'), data=sub.data)
-lengthfun<-length(summary(mfirst)$p.coeff)
-yori9[i,] <- as.data.frame(summary(mfirst)$p.coeff)[lengthfun,1]
-Sori9[[i]] <- vcov(mfirst)[lengthfun,lengthfun]
-assign(paste("model9.",i,sep=""),mfirst)
-}
-which(yori8.1!=0)
-mvall9<-mvmeta(yori9~1, Sori9, method="reml")
-summary(mvall9)
-
-#Age group 14
-Hepatitis.B.agegroup14<-read.xlsx("Agegroup14.xlsx")
-Hepatitis.B.agegroup14$Month.factor<-factor(Hepatitis.B.agegroup14$Month)
-Hepatitis.B.agegroup14$Time<-rep(c(0:179),31)
-Hepatitis.B.agegroup14$Holiday<-factor(rep(rep(c(1,1,0,0,0,0,2,2,0,0,0,0),15),31))
-Hepatitis.B.agegroup14$Intervention.2009<-factor(rep(c(rep(0,14*12),rep(1,12*1)),31))
-Hepatitis.B.agegroup14$Interaction.2009<-rep(c(rep(0,14*12),c(0:(180-12*14-1))),31)
-Hepatitis.B.agegroup14<-left_join(Hepatitis.B.agegroup14,Socio.class,by=c("Province","Year"))
-regions<-as.character(unique(Hepatitis.B.agegroup14$Province))
-datalist<-lapply(regions, function(x) Hepatitis.B.agegroup14[Hepatitis.B.agegroup14$Province==x, ])
-seq(datalist)
-yori10<-matrix(0, length(datalist), 1, dimnames=list(regions, "beta"))
-Sori10<-vector("list", length(datalist)); names(Sori10) <- regions
-for(i in c(1:31))
-{sub.data<-Hepatitis.B.agegroup14[which(Hepatitis.B.agegroup14$Order==i),]
-mfirst<-gam(Case~ offset(log(Population.book))+Intervention.2009+Interaction.2009+
-              Time+ns(Temperature,df=3)+
-              #ns(Rain,df=4)+ns(Wind,df=4)+
-              #ns(Sunshine,df=4)+
-              Holiday+Illiteracy.class+Illiteracy.class:Interaction.2009,#+Holiday+GDP+Birth_Rate
-            family=quasipoisson(link='log'), data=sub.data)
-lengthfun<-length(summary(mfirst)$p.coeff)
-yori10[i,] <- as.data.frame(summary(mfirst)$p.coeff)[lengthfun,1]
-Sori10[[i]] <- vcov(mfirst)[lengthfun,lengthfun]
-assign(paste("model10.",i,sep=""),mfirst)
-}
-which(yori10!=0)
-mvall10<-mvmeta(yori10~1, Sori10, method="reml")
-summary(mvall10)
-
